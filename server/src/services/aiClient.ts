@@ -306,7 +306,7 @@ class MockAiClient {
     targetLanguage: AppLanguage,
     variationHint?: string
   ): Promise<SuggestedFlashcard[]> {
-    const seed = recentCards.at(0)?.sourceText ?? "book";
+    const seed = recentCards[0]?.sourceText ?? "book";
     const suffix = variationHint ? variationHint.slice(-4) : "seed";
     return Array.from({ length: 10 }, (_, index) => ({
       id: `mock-${suffix}-${index + 1}`,
@@ -583,7 +583,7 @@ class OpenAiCompatibleAiClient {
     const englishItems = parsedEnglish.suggestions.map((suggestion) => suggestion.englishText.trim());
     const needsHebrew = sourceLanguage === "he" || targetLanguage === "he";
 
-    let translatedPairs = englishItems.map((englishText) => ({
+    let translatedPairs: Array<{ englishText: string; translatedText: string }> = englishItems.map((englishText) => ({
       englishText,
       translatedText: englishText
     }));
@@ -626,7 +626,11 @@ class OpenAiCompatibleAiClient {
 
       const translationPayload = (await translationResponse.json()) as unknown;
       const translationContent = extractResponseOutputText(translationPayload);
-      translatedPairs = translatedSuggestionsSchema.parse(extractJsonObject(translationContent)).translations;
+      const parsedTranslations = translatedSuggestionsSchema.parse(extractJsonObject(translationContent));
+      translatedPairs = parsedTranslations.translations.map((item) => ({
+        englishText: item.englishText.trim(),
+        translatedText: item.translatedText.trim()
+      }));
     }
 
     return translatedPairs.map((item, index) => ({

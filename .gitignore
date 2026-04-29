@@ -6,3 +6,4 @@ dist
 server/data
 server/generated/images
 
+.vercel

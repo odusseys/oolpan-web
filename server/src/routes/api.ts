@@ -1,4 +1,5 @@
 import { Router, type Request } from "express";
+import type { CreateFlashcardRequest, ReviewRequest, SpeechRequest, TranslationRequest } from "@study/shared";
 import { z } from "zod";
 import {
   createFlashcardRequestSchema,
@@ -160,7 +161,7 @@ apiRouter.post("/translate", async (req, res, next) => {
       return;
     }
 
-    const payload = translationRequestSchema.parse(req.body);
+    const payload = translationRequestSchema.parse(req.body) as TranslationRequest;
     const result = await translatePhrase(payload);
     res.json(result);
   } catch (error) {
@@ -176,7 +177,7 @@ apiRouter.post("/audio/speech", async (req, res, next) => {
       return;
     }
 
-    const payload = speechRequestSchema.parse(req.body);
+    const payload = speechRequestSchema.parse(req.body) as SpeechRequest;
     res.json(await generateSpeech(payload));
   } catch (error) {
     next(error);
@@ -191,7 +192,7 @@ apiRouter.post("/flashcards", async (req, res, next) => {
       return;
     }
 
-    const payload = createFlashcardRequestSchema.parse(req.body);
+    const payload = createFlashcardRequestSchema.parse(req.body) as CreateFlashcardRequest;
     const result = await createFlashcardWithImage(user.id, payload);
     res.status(201).json(result);
   } catch (error) {
@@ -208,7 +209,7 @@ apiRouter.post("/flashcards/:id/review", (req, res, next) => {
     }
 
     const cardId = z.coerce.number().int().positive().parse(req.params.id);
-    const payload = reviewRequestSchema.parse(req.body);
+    const payload = reviewRequestSchema.parse(req.body) as ReviewRequest;
     res.json(await reviewCard(user.id, cardId, payload));
   })().catch((error) => {
     next(error);
