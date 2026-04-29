@@ -16,8 +16,11 @@ async function buildApp() {
         const isNgrokOrigin =
           typeof origin === "string" &&
           (origin.endsWith(".ngrok-free.app") || origin.endsWith(".ngrok.app") || origin.endsWith(".ngrok-free.dev"));
+        const isVercelOrigin =
+          typeof origin === "string" &&
+          (origin.endsWith(".vercel.app") || origin.endsWith(".vercel.live"));
 
-        if (!origin || isNgrokOrigin || appConfig.allowedClientOrigins.includes(origin)) {
+        if (!origin || isNgrokOrigin || isVercelOrigin || appConfig.allowedClientOrigins.includes(origin)) {
           callback(null, true);
           return;
         }
