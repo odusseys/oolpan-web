@@ -32,14 +32,12 @@ type FlashcardRow = {
   is_active: boolean;
 };
 
-type DeckTotalsRow = {
+type DeckStatsRow = {
   total_cards: number;
   average_weight: number;
   struggling_cards: number;
-};
-
-type CountRow = {
-  count: number;
+  due_soon: number;
+  learned_words: number;
 };
 
 type DbQueryable = DbClient | TransactionSql<Record<string, unknown>>;
@@ -246,43 +244,36 @@ export async function deleteFlashcard(userId: number, id: number) {
 }
 
 export async function getDeckStats(userId: number): Promise<DeckStats> {
-  const totalsRows = await db<DeckTotalsRow[]>`
+  const statsRows = await db<DeckStatsRow[]>`
     SELECT
-      COUNT(*)::int AS total_cards,
-      COALESCE(AVG(weight), 0)::float8 AS average_weight,
-      COUNT(*) FILTER (WHERE weight <= 0.35)::int AS struggling_cards
-    FROM flashcards
-    WHERE user_id = ${userId} AND is_active = TRUE
-  `;
-
-  const dueSoonRows = await db<CountRow[]>`
-    SELECT COUNT(*)::int AS count
+      COUNT(*) FILTER (WHERE is_active = TRUE)::int AS total_cards,
+      COALESCE(AVG(weight) FILTER (WHERE is_active = TRUE), 0)::float8 AS average_weight,
+      COUNT(*) FILTER (WHERE is_active = TRUE AND weight <= 0.35)::int AS struggling_cards,
+      COUNT(*) FILTER (
+        WHERE is_active = TRUE
+          AND (
+            last_reviewed_at IS NULL
+            OR last_reviewed_at <= NOW() - INTERVAL '30 minutes'
+          )
+      )::int AS due_soon,
+      COUNT(*) FILTER (WHERE weight > 0.8)::int AS learned_words
     FROM flashcards
     WHERE user_id = ${userId}
-      AND is_active = TRUE
-      AND (
-        last_reviewed_at IS NULL
-        OR last_reviewed_at <= NOW() - INTERVAL '30 minutes'
-      )
   `;
 
-  const learnedRows = await db<CountRow[]>`
-    SELECT COUNT(*)::int AS count
-    FROM flashcards
-    WHERE user_id = ${userId} AND weight > 0.8
-  `;
-
-  const totals = totalsRows[0] ?? {
+  const totals = statsRows[0] ?? {
     total_cards: 0,
     average_weight: 0,
-    struggling_cards: 0
+    struggling_cards: 0,
+    due_soon: 0,
+    learned_words: 0
   };
 
   return {
     totalCards: totals.total_cards,
-    dueSoon: dueSoonRows[0]?.count ?? 0,
+    dueSoon: totals.due_soon,
     struggling: totals.struggling_cards,
     averageWeight: Number(totals.average_weight ?? 0),
-    learnedWords: learnedRows[0]?.count ?? 0
+    learnedWords: totals.learned_words
   };
 }

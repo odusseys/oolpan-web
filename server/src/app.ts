@@ -19,8 +19,13 @@ async function buildApp() {
         const isVercelOrigin =
           typeof origin === "string" &&
           (origin.endsWith(".vercel.app") || origin.endsWith(".vercel.live"));
+        const isOolpanOrigin =
+          typeof origin === "string" &&
+          (origin === "https://oolpan.com" ||
+            origin === "https://www.oolpan.com" ||
+            origin.endsWith(".oolpan.com"));
 
-        if (!origin || isNgrokOrigin || isVercelOrigin || appConfig.allowedClientOrigins.includes(origin)) {
+        if (!origin || isNgrokOrigin || isVercelOrigin || isOolpanOrigin || appConfig.allowedClientOrigins.includes(origin)) {
           callback(null, true);
           return;
         }

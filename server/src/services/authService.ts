@@ -6,6 +6,10 @@ import { generateDefaultPassword, hashPassword, verifyPassword } from "../lib/pa
 const GOOGLE_USERNAME_MAX_LENGTH = 32;
 const googleClient = appConfig.googleClientId ? new OAuth2Client(appConfig.googleClientId) : null;
 
+function isUniqueViolation(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "23505";
+}
+
 function normalizeGoogleUsername(value: string) {
   const normalized = value
     .trim()
@@ -47,17 +51,22 @@ async function makeAvailableGoogleUsername(name: string | null | undefined, emai
 }
 
 export async function registerUser(username: string) {
-  const existing = await getUserByUsername(username);
-  if (existing) {
-    throw new Error("That username is already taken");
+  const defaultPassword = generateDefaultPassword();
+  let created;
+  try {
+    created = await createUser({
+      username,
+      passwordHash: hashPassword(defaultPassword),
+      authProvider: "local"
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new Error("That username is already taken");
+    }
+
+    throw error;
   }
 
-  const defaultPassword = generateDefaultPassword();
-  const created = await createUser({
-    username,
-    passwordHash: hashPassword(defaultPassword),
-    authProvider: "local"
-  });
   if (!created) {
     throw new Error("Could not create user");
   }
