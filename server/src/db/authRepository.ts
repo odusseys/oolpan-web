@@ -12,13 +12,15 @@ type UserRow = {
   created_at: string;
 };
 
+type SessionUserRow = Pick<UserRow, "id" | "username" | "auth_provider" | "email" | "created_at">;
+
 type StoredUser = {
   user: User;
   passwordHash: string;
   googleSub: string | null;
 };
 
-function mapUser(row: Pick<UserRow, "id" | "username" | "auth_provider" | "email" | "created_at">): User {
+function mapUser(row: SessionUserRow): User {
   return {
     id: row.id,
     username: row.username,
@@ -36,25 +38,35 @@ function mapStoredUser(row: UserRow): StoredUser {
   };
 }
 
-export function getUserById(id: number) {
-  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow | undefined;
+export async function getUserById(id: number) {
+  const rows = await db<UserRow[]>`
+    SELECT * FROM users WHERE id = ${id} LIMIT 1
+  `;
+  const row = rows[0];
   return row ? mapStoredUser(row) : null;
 }
 
-export function getUserByUsername(username: string) {
-  const row = db
-    .prepare("SELECT * FROM users WHERE lower(username) = lower(?)")
-    .get(username.trim()) as UserRow | undefined;
-
+export async function getUserByUsername(username: string) {
+  const rows = await db<UserRow[]>`
+    SELECT * FROM users
+    WHERE LOWER(username) = LOWER(${username.trim()})
+    LIMIT 1
+  `;
+  const row = rows[0];
   return row ? mapStoredUser(row) : null;
 }
 
-export function getUserByGoogleSub(googleSub: string) {
-  const row = db.prepare("SELECT * FROM users WHERE google_sub = ?").get(googleSub) as UserRow | undefined;
+export async function getUserByGoogleSub(googleSub: string) {
+  const rows = await db<UserRow[]>`
+    SELECT * FROM users
+    WHERE google_sub = ${googleSub}
+    LIMIT 1
+  `;
+  const row = rows[0];
   return row ? mapStoredUser(row) : null;
 }
 
-export function createUser(options: {
+export async function createUser(options: {
   username: string;
   passwordHash: string;
   authProvider?: AuthProvider;
@@ -63,54 +75,51 @@ export function createUser(options: {
 }) {
   const now = new Date().toISOString();
   const authProvider = options.authProvider ?? "local";
-  const info = db
-    .prepare(
-      `
-        INSERT INTO users (username, password_hash, auth_provider, google_sub, email, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `
-    )
-    .run(
-      options.username.trim(),
-      options.passwordHash,
-      authProvider,
-      options.googleSub ?? null,
-      options.email ?? null,
-      now
-    );
 
-  return getUserById(Number(info.lastInsertRowid));
+  const rows = await db<UserRow[]>`
+    INSERT INTO users (username, password_hash, auth_provider, google_sub, email, created_at)
+    VALUES (
+      ${options.username.trim()},
+      ${options.passwordHash},
+      ${authProvider},
+      ${options.googleSub ?? null},
+      ${options.email ?? null},
+      ${now}
+    )
+    RETURNING *
+  `;
+
+  const row = rows[0];
+  return row ? mapStoredUser(row) : null;
 }
 
-export function createSession(userId: number) {
+export async function createSession(userId: number) {
   const token = randomBytes(24).toString("hex");
   const now = new Date().toISOString();
 
-  db.prepare(
-    `
-      INSERT INTO user_sessions (token, user_id, created_at)
-      VALUES (?, ?, ?)
-    `
-  ).run(token, userId, now);
+  await db`
+    INSERT INTO user_sessions (token, user_id, created_at)
+    VALUES (${token}, ${userId}, ${now})
+  `;
 
   return token;
 }
 
-export function getSessionUser(token: string) {
-  const row = db
-    .prepare(
-      `
-        SELECT users.id, users.username, users.auth_provider, users.email, users.created_at
-        FROM user_sessions
-        JOIN users ON users.id = user_sessions.user_id
-        WHERE user_sessions.token = ?
-      `
-    )
-    .get(token) as Pick<UserRow, "id" | "username" | "auth_provider" | "email" | "created_at"> | undefined;
+export async function getSessionUser(token: string) {
+  const rows = await db<SessionUserRow[]>`
+    SELECT users.id, users.username, users.auth_provider, users.email, users.created_at
+    FROM user_sessions
+    JOIN users ON users.id = user_sessions.user_id
+    WHERE user_sessions.token = ${token}
+    LIMIT 1
+  `;
 
+  const row = rows[0];
   return row ? mapUser(row) : null;
 }
 
-export function deleteSession(token: string) {
-  db.prepare("DELETE FROM user_sessions WHERE token = ?").run(token);
+export async function deleteSession(token: string) {
+  await db`
+    DELETE FROM user_sessions WHERE token = ${token}
+  `;
 }

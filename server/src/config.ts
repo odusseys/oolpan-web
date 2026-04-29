@@ -1,14 +1,16 @@
 import { config as loadEnv } from "dotenv";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-loadEnv();
+loadEnv({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(4000),
   CLIENT_ORIGIN: z.string().default("http://127.0.0.1:5173"),
-  DATABASE_PATH: z.string().default("./data/flashcards.sqlite"),
-  GENERATED_ASSET_DIR: z.string().default("./generated/images"),
+  OOLPAN_STORAGE_DATABASE_URL: z.string().optional(),
+  OOLPAN_STORAGE_DATABASE_URL_UNPOOLED: z.string().optional(),
+  DATABASE_URL: z.string().optional(),
+  DATABASE_URL_UNPOOLED: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   FAL_KEY: z.string().optional(),
   FAL_IMAGE_MODEL: z.string().default("fal-ai/flux/schnell"),
@@ -32,13 +34,20 @@ const envSchema = z.object({
 const env = envSchema.parse(process.env);
 const openAiKey = env.OPENAI_API_KEY ?? env.OPENAI_KEY;
 const defaultApiBaseUrl = env.OPENAI_BASE_URL;
+const databaseUrl = env.OOLPAN_STORAGE_DATABASE_URL ?? env.DATABASE_URL;
+const databaseUrlUnpooled =
+  env.OOLPAN_STORAGE_DATABASE_URL_UNPOOLED ?? env.DATABASE_URL_UNPOOLED ?? databaseUrl;
+
+if (!databaseUrl || !databaseUrlUnpooled) {
+  throw new Error("Database configuration is missing. Set OOLPAN_STORAGE_DATABASE_URL and OOLPAN_STORAGE_DATABASE_URL_UNPOOLED.");
+}
 
 export const appConfig = {
   port: env.PORT,
   clientOrigin: env.CLIENT_ORIGIN,
   allowedClientOrigins: Array.from(new Set([env.CLIENT_ORIGIN, "http://127.0.0.1:5173", "http://localhost:5173"])),
-  databasePath: resolve(process.cwd(), env.DATABASE_PATH),
-  generatedAssetDir: resolve(process.cwd(), env.GENERATED_ASSET_DIR),
+  databaseUrl,
+  databaseUrlUnpooled,
   googleClientId: env.GOOGLE_CLIENT_ID,
   falKey: env.FAL_KEY,
   falImageModel: env.FAL_IMAGE_MODEL,

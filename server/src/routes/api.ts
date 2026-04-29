@@ -31,7 +31,7 @@ import {
 
 export const apiRouter = Router();
 
-function getRequestUser(req: Request) {
+async function getRequestUser(req: Request) {
   const authorization = req.header("authorization");
   const token = authorization?.startsWith("Bearer ") ? authorization.slice("Bearer ".length).trim() : null;
 
@@ -41,7 +41,7 @@ function getRequestUser(req: Request) {
 
   return {
     token,
-    user: getUserFromSessionToken(token)
+    user: await getUserFromSessionToken(token)
   };
 }
 
@@ -50,21 +50,21 @@ apiRouter.get("/health", (_req, res) => {
 });
 
 apiRouter.post("/auth/register", (req, res, next) => {
-  try {
+  void (async () => {
     const payload = registerUserRequestSchema.parse(req.body);
-    res.status(201).json(registerUser(payload.username));
-  } catch (error) {
+    res.status(201).json(await registerUser(payload.username));
+  })().catch((error) => {
     next(error);
-  }
+  });
 });
 
 apiRouter.post("/auth/login", (req, res, next) => {
-  try {
+  void (async () => {
     const payload = loginRequestSchema.parse(req.body);
-    res.json(loginUser(payload.username, payload.password));
-  } catch (error) {
+    res.json(await loginUser(payload.username, payload.password));
+  })().catch((error) => {
     next(error);
-  }
+  });
 });
 
 apiRouter.get("/auth/google/config", (_req, res) => {
@@ -80,48 +80,64 @@ apiRouter.post("/auth/google", async (req, res, next) => {
   }
 });
 
-apiRouter.get("/auth/me", (req, res) => {
-  const { user } = getRequestUser(req);
-  if (!user) {
-    res.status(401).json({ message: "Authentication required" });
-    return;
-  }
+apiRouter.get("/auth/me", (req, res, next) => {
+  void (async () => {
+    const { user } = await getRequestUser(req);
+    if (!user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
 
-  res.json({ user });
+    res.json({ user });
+  })().catch((error) => {
+    next(error);
+  });
 });
 
-apiRouter.post("/auth/logout", (req, res) => {
-  const { token } = getRequestUser(req);
-  if (token) {
-    logoutSession(token);
-  }
+apiRouter.post("/auth/logout", (req, res, next) => {
+  void (async () => {
+    const { token } = await getRequestUser(req);
+    if (token) {
+      await logoutSession(token);
+    }
 
-  res.status(204).end();
+    res.status(204).end();
+  })().catch((error) => {
+    next(error);
+  });
 });
 
-apiRouter.get("/stats", (req, res) => {
-  const { user } = getRequestUser(req);
-  if (!user) {
-    res.status(401).json({ message: "Authentication required" });
-    return;
-  }
+apiRouter.get("/stats", (req, res, next) => {
+  void (async () => {
+    const { user } = await getRequestUser(req);
+    if (!user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
 
-  res.json(getStudyStats(user.id));
+    res.json(await getStudyStats(user.id));
+  })().catch((error) => {
+    next(error);
+  });
 });
 
-apiRouter.get("/flashcards/next", (req, res) => {
-  const { user } = getRequestUser(req);
-  if (!user) {
-    res.status(401).json({ message: "Authentication required" });
-    return;
-  }
+apiRouter.get("/flashcards/next", (req, res, next) => {
+  void (async () => {
+    const { user } = await getRequestUser(req);
+    if (!user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
 
-  res.json(getNextStudyCard(user.id));
+    res.json(await getNextStudyCard(user.id));
+  })().catch((error) => {
+    next(error);
+  });
 });
 
 apiRouter.get("/suggestions", async (req, res, next) => {
   try {
-    const { user } = getRequestUser(req);
+    const { user } = await getRequestUser(req);
     if (!user) {
       res.status(401).json({ message: "Authentication required" });
       return;
@@ -138,7 +154,7 @@ apiRouter.get("/suggestions", async (req, res, next) => {
 
 apiRouter.post("/translate", async (req, res, next) => {
   try {
-    const { user } = getRequestUser(req);
+    const { user } = await getRequestUser(req);
     if (!user) {
       res.status(401).json({ message: "Authentication required" });
       return;
@@ -154,7 +170,7 @@ apiRouter.post("/translate", async (req, res, next) => {
 
 apiRouter.post("/audio/speech", async (req, res, next) => {
   try {
-    const { user } = getRequestUser(req);
+    const { user } = await getRequestUser(req);
     if (!user) {
       res.status(401).json({ message: "Authentication required" });
       return;
@@ -169,7 +185,7 @@ apiRouter.post("/audio/speech", async (req, res, next) => {
 
 apiRouter.post("/flashcards", async (req, res, next) => {
   try {
-    const { user } = getRequestUser(req);
+    const { user } = await getRequestUser(req);
     if (!user) {
       res.status(401).json({ message: "Authentication required" });
       return;
@@ -184,8 +200,8 @@ apiRouter.post("/flashcards", async (req, res, next) => {
 });
 
 apiRouter.post("/flashcards/:id/review", (req, res, next) => {
-  try {
-    const { user } = getRequestUser(req);
+  void (async () => {
+    const { user } = await getRequestUser(req);
     if (!user) {
       res.status(401).json({ message: "Authentication required" });
       return;
@@ -193,23 +209,23 @@ apiRouter.post("/flashcards/:id/review", (req, res, next) => {
 
     const cardId = z.coerce.number().int().positive().parse(req.params.id);
     const payload = reviewRequestSchema.parse(req.body);
-    res.json(reviewCard(user.id, cardId, payload));
-  } catch (error) {
+    res.json(await reviewCard(user.id, cardId, payload));
+  })().catch((error) => {
     next(error);
-  }
+  });
 });
 
 apiRouter.delete("/flashcards/:id", (req, res, next) => {
-  try {
-    const { user } = getRequestUser(req);
+  void (async () => {
+    const { user } = await getRequestUser(req);
     if (!user) {
       res.status(401).json({ message: "Authentication required" });
       return;
     }
 
     const cardId = z.coerce.number().int().positive().parse(req.params.id);
-    res.json(removeFlashcard(user.id, cardId));
-  } catch (error) {
+    res.json(await removeFlashcard(user.id, cardId));
+  })().catch((error) => {
     next(error);
-  }
+  });
 });

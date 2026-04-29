@@ -1,12 +1,13 @@
 import cors from "cors";
-import express from "express";
+import express, { type Express } from "express";
 import { appConfig } from "./config.js";
 import { initializeSchema } from "./db/schema.js";
 import { apiRouter } from "./routes/api.js";
 
-initializeSchema();
+let appPromise: Promise<Express> | null = null;
 
-export function createApp() {
+async function buildApp() {
+  await initializeSchema();
   const app = express();
 
   app.use(
@@ -26,7 +27,6 @@ export function createApp() {
     })
   );
   app.use(express.json({ limit: "2mb" }));
-  app.use("/assets", express.static(appConfig.generatedAssetDir));
   app.use("/api", apiRouter);
 
   app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -36,4 +36,15 @@ export function createApp() {
   });
 
   return app;
+}
+
+export function getApp() {
+  if (!appPromise) {
+    appPromise = buildApp().catch((error) => {
+      appPromise = null;
+      throw error;
+    });
+  }
+
+  return appPromise;
 }

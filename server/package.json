@@ -11,16 +11,15 @@
   },
   "dependencies": {
     "@study/shared": "*",
-    "better-sqlite3": "^12.1.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "google-auth-library": "^10.6.2",
     "jimp": "^1.6.1",
+    "postgres": "^3.4.9",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.2.1",

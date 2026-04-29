@@ -1,9 +1,21 @@
-import Database from "better-sqlite3";
+import postgres, { type Sql } from "postgres";
 import { appConfig } from "../config.js";
-import { ensureParentDir } from "../lib/paths.js";
 
-ensureParentDir(appConfig.databasePath);
+export type DbClient = Sql<Record<string, unknown>>;
 
-export const db = new Database(appConfig.databasePath);
-db.pragma("journal_mode = WAL");
+function createClient(connectionString: string) {
+  return postgres(connectionString, {
+    prepare: false,
+    ssl: "require"
+  });
+}
 
+export const db = createClient(appConfig.databaseUrl);
+export const adminDb = appConfig.databaseUrlUnpooled === appConfig.databaseUrl ? db : createClient(appConfig.databaseUrlUnpooled);
+
+export async function closeDatabaseConnections() {
+  await db.end({ timeout: 5 });
+  if (adminDb !== db) {
+    await adminDb.end({ timeout: 5 });
+  }
+}

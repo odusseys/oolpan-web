@@ -2,6 +2,7 @@ import type {
   AppLanguage,
   CreateFlashcardRequest,
   DeleteFlashcardResponse,
+  FlashcardRecord,
   ReviewRequest,
   ReviewResponse,
   SpeechRequest,
@@ -28,7 +29,7 @@ function toImageUrl(imageData: string | null) {
   return imageData;
 }
 
-function toStudyCard(card: NonNullable<ReturnType<typeof getFlashcardById>>): StudyCard {
+function toStudyCard(card: FlashcardRecord): StudyCard {
   const promptSide = Math.random() > 0.5 ? "source" : "target";
 
   return {
@@ -44,11 +45,11 @@ function toStudyCard(card: NonNullable<ReturnType<typeof getFlashcardById>>): St
 }
 
 export async function createFlashcardWithImage(userId: number, input: CreateFlashcardRequest) {
-  const existing = findFlashcardByPhrase(userId, input);
+  const existing = await findFlashcardByPhrase(userId, input);
   if (existing?.imageData && existing.isActive) {
     return {
       card: existing,
-      stats: getDeckStats(userId)
+      stats: await getDeckStats(userId)
     };
   }
 
@@ -60,7 +61,7 @@ export async function createFlashcardWithImage(userId: number, input: CreateFlas
       targetLanguage: input.targetLanguage
     }));
   const generated = existing?.imageData ? null : await aiClient.generateIllustration(imagePrompt);
-  const saved = createFlashcard(userId, { ...input, imagePrompt }, generated?.dataUrl ?? null);
+  const saved = await createFlashcard(userId, { ...input, imagePrompt }, generated?.dataUrl ?? null);
 
   if (!saved) {
     throw new Error("Could not create flashcard");
@@ -68,12 +69,12 @@ export async function createFlashcardWithImage(userId: number, input: CreateFlas
 
   return {
     card: saved,
-    stats: getDeckStats(userId)
+    stats: await getDeckStats(userId)
   };
 }
 
-export function getNextStudyCard(userId: number, excludedIds: number[] = []) {
-  const cards = listFlashcards(userId);
+export async function getNextStudyCard(userId: number, excludedIds: number[] = []) {
+  const cards = await listFlashcards(userId);
   if (cards.length === 1) {
     const onlyCard = cards[0];
     if (!onlyCard) {
@@ -100,7 +101,7 @@ export function getNextStudyCard(userId: number, excludedIds: number[] = []) {
   return card;
 }
 
-export function getStudyStats(userId: number) {
+export async function getStudyStats(userId: number) {
   return getDeckStats(userId);
 }
 
@@ -122,7 +123,7 @@ export async function suggestFlashcards(
   targetLanguage: AppLanguage,
   variationHint?: string
 ): Promise<SuggestionsResponse> {
-  const recent = listRecentFlashcards(userId, 5);
+  const recent = await listRecentFlashcards(userId, 5);
   if (recent.length === 0) {
     return { suggestions: [], basedOnCount: 0 };
   }
@@ -134,14 +135,14 @@ export async function suggestFlashcards(
   };
 }
 
-export function reviewCard(userId: number, cardId: number, body: ReviewRequest): ReviewResponse {
-  const card = getFlashcardById(userId, cardId);
+export async function reviewCard(userId: number, cardId: number, body: ReviewRequest): Promise<ReviewResponse> {
+  const card = await getFlashcardById(userId, cardId);
   if (!card) {
     throw new Error("Flashcard not found");
   }
 
   const updates = applyReviewOutcome(card, body.result);
-  const updatedCard = updateFlashcardReviewState(userId, cardId, updates);
+  const updatedCard = await updateFlashcardReviewState(userId, cardId, updates);
 
   if (!updatedCard) {
     throw new Error("Could not update flashcard");
@@ -149,13 +150,13 @@ export function reviewCard(userId: number, cardId: number, body: ReviewRequest):
 
   return {
     updatedCard,
-    nextCard: getNextStudyCard(userId, [cardId]),
-    stats: getDeckStats(userId)
+    nextCard: await getNextStudyCard(userId, [cardId]),
+    stats: await getDeckStats(userId)
   };
 }
 
-export function removeFlashcard(userId: number, cardId: number): DeleteFlashcardResponse {
-  const removed = deleteFlashcard(userId, cardId);
+export async function removeFlashcard(userId: number, cardId: number): Promise<DeleteFlashcardResponse> {
+  const removed = await deleteFlashcard(userId, cardId);
   if (!removed) {
     throw new Error("Flashcard not found");
   }
@@ -166,7 +167,7 @@ export function removeFlashcard(userId: number, cardId: number): DeleteFlashcard
 
   return {
     removedId: cardId,
-    nextCard: getNextStudyCard(userId, [cardId]),
-    stats: getDeckStats(userId)
+    nextCard: await getNextStudyCard(userId, [cardId]),
+    stats: await getDeckStats(userId)
   };
 }

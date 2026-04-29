@@ -5,6 +5,8 @@ import type {
   ReviewResult,
   TranslationResult
 } from "@study/shared";
+import type { TransactionSql } from "postgres";
+import type { DbClient } from "./database.js";
 import { db } from "./database.js";
 import { DEFAULT_ADAPTIVE_LEARNING_SCORE } from "../lib/scheduler.js";
 
@@ -27,8 +29,20 @@ type FlashcardRow = {
   updated_at: string;
   last_reviewed_at: string | null;
   last_result: ReviewResult | null;
-  is_active: number;
+  is_active: boolean;
 };
+
+type DeckTotalsRow = {
+  total_cards: number;
+  average_weight: number;
+  struggling_cards: number;
+};
+
+type CountRow = {
+  count: number;
+};
+
+type DbQueryable = DbClient | TransactionSql<Record<string, unknown>>;
 
 function mapRow(row: FlashcardRow): FlashcardRecord {
   return {
@@ -49,127 +63,145 @@ function mapRow(row: FlashcardRow): FlashcardRecord {
     updatedAt: row.updated_at,
     lastReviewedAt: row.last_reviewed_at,
     lastResult: row.last_result,
-    isActive: row.is_active === 1
+    isActive: row.is_active
   };
 }
 
-export function listFlashcards(userId: number) {
-  const rows = db
-    .prepare("SELECT * FROM flashcards WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC")
-    .all(userId) as FlashcardRow[];
-  return rows.map(mapRow);
-}
-
-export function listRecentFlashcards(userId: number, limit = 5) {
-  const rows = db
-    .prepare("SELECT * FROM flashcards WHERE user_id = ? ORDER BY datetime(created_at) DESC LIMIT ?")
-    .all(userId, limit) as FlashcardRow[];
-  return rows.map(mapRow);
-}
-
-export function getFlashcardById(userId: number, id: number) {
-  const row = db
-    .prepare("SELECT * FROM flashcards WHERE user_id = ? AND id = ?")
-    .get(userId, id) as FlashcardRow | undefined;
+async function getFlashcardByIdWithClient(sql: DbQueryable, userId: number, id: number) {
+  const rows = await sql<FlashcardRow[]>`
+    SELECT * FROM flashcards
+    WHERE user_id = ${userId} AND id = ${id}
+    LIMIT 1
+  `;
+  const row = rows[0];
   return row ? mapRow(row) : null;
 }
 
-export function findFlashcardByPhrase(userId: number, translation: TranslationResult | CreateFlashcardRequest) {
-  const row = db
-    .prepare(
-      `
-        SELECT * FROM flashcards
-        WHERE user_id = ?
-          AND source_text = ?
-          AND source_language = ?
-          AND target_text = ?
-          AND target_language = ?
-      `
-    )
-    .get(
-      userId,
-      translation.sourceText.trim(),
-      translation.sourceLanguage,
-      translation.targetText.trim(),
-      translation.targetLanguage
-    ) as FlashcardRow | undefined;
+async function findFlashcardByPhraseWithClient(
+  sql: DbQueryable,
+  userId: number,
+  translation: TranslationResult | CreateFlashcardRequest
+) {
+  const rows = await sql<FlashcardRow[]>`
+    SELECT * FROM flashcards
+    WHERE user_id = ${userId}
+      AND source_text = ${translation.sourceText.trim()}
+      AND source_language = ${translation.sourceLanguage}
+      AND target_text = ${translation.targetText.trim()}
+      AND target_language = ${translation.targetLanguage}
+    LIMIT 1
+  `;
 
+  const row = rows[0];
   return row ? mapRow(row) : null;
 }
 
-export function createFlashcard(userId: number, input: CreateFlashcardRequest, imageData: string | null) {
-  const existing = findFlashcardByPhrase(userId, input);
-  if (existing) {
-    reactivateFlashcard(userId, existing.id, imageData);
-    return getFlashcardById(userId, existing.id);
-  }
+async function reactivateFlashcardWithClient(sql: DbQueryable, userId: number, id: number, imageData: string | null) {
+  const updatedAt = new Date().toISOString();
 
-  const now = new Date().toISOString();
-  const info = db
-    .prepare(
-      `
-        INSERT INTO flashcards (
-          user_id,
-          source_text,
-          source_language,
-          target_text,
-          target_language,
-          part_of_speech,
-          noun_gender,
-          image_prompt,
-          image_data,
-          weight,
-          review_count,
-          mistake_count,
-          consecutive_correct,
-          created_at,
-          updated_at,
-          last_reviewed_at,
-          last_result
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?, NULL, NULL)
-      `
-    )
-    .run(
-      userId,
-      input.sourceText.trim(),
-      input.sourceLanguage,
-      input.targetText.trim(),
-      input.targetLanguage,
-      input.partOfSpeech,
-      input.nounGender,
-      input.imagePrompt,
-      imageData,
-      DEFAULT_ADAPTIVE_LEARNING_SCORE,
-      now,
-      now
-    );
-
-  return getFlashcardById(userId, Number(info.lastInsertRowid));
-}
-
-function reactivateFlashcard(userId: number, id: number, imageData: string | null) {
   if (imageData) {
-    db.prepare(
-      `
-        UPDATE flashcards
-        SET is_active = 1,
-            image_data = COALESCE(image_data, ?),
-            updated_at = ?
-        WHERE user_id = ? AND id = ?
-      `
-    ).run(imageData, new Date().toISOString(), userId, id);
+    await sql`
+      UPDATE flashcards
+      SET is_active = TRUE,
+          image_data = COALESCE(image_data, ${imageData}),
+          updated_at = ${updatedAt}
+      WHERE user_id = ${userId} AND id = ${id}
+    `;
     return;
   }
 
-  db.prepare("UPDATE flashcards SET is_active = 1, updated_at = ? WHERE user_id = ? AND id = ?").run(
-    new Date().toISOString(),
-    userId,
-    id
-  );
+  await sql`
+    UPDATE flashcards
+    SET is_active = TRUE,
+        updated_at = ${updatedAt}
+    WHERE user_id = ${userId} AND id = ${id}
+  `;
 }
 
-export function updateFlashcardReviewState(
+export async function listFlashcards(userId: number) {
+  const rows = await db<FlashcardRow[]>`
+    SELECT * FROM flashcards
+    WHERE user_id = ${userId} AND is_active = TRUE
+    ORDER BY created_at DESC
+  `;
+  return rows.map(mapRow);
+}
+
+export async function listRecentFlashcards(userId: number, limit = 5) {
+  const rows = await db<FlashcardRow[]>`
+    SELECT * FROM flashcards
+    WHERE user_id = ${userId}
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows.map(mapRow);
+}
+
+export async function getFlashcardById(userId: number, id: number) {
+  return getFlashcardByIdWithClient(db, userId, id);
+}
+
+export async function findFlashcardByPhrase(userId: number, translation: TranslationResult | CreateFlashcardRequest) {
+  return findFlashcardByPhraseWithClient(db, userId, translation);
+}
+
+export async function createFlashcard(userId: number, input: CreateFlashcardRequest, imageData: string | null) {
+  return db.begin(async (sql) => {
+    const existing = await findFlashcardByPhraseWithClient(sql, userId, input);
+    if (existing) {
+      await reactivateFlashcardWithClient(sql, userId, existing.id, imageData);
+      return getFlashcardByIdWithClient(sql, userId, existing.id);
+    }
+
+    const now = new Date().toISOString();
+    const rows = await sql<FlashcardRow[]>`
+      INSERT INTO flashcards (
+        user_id,
+        source_text,
+        source_language,
+        target_text,
+        target_language,
+        part_of_speech,
+        noun_gender,
+        image_prompt,
+        image_data,
+        weight,
+        review_count,
+        mistake_count,
+        consecutive_correct,
+        created_at,
+        updated_at,
+        last_reviewed_at,
+        last_result
+      )
+      VALUES (
+        ${userId},
+        ${input.sourceText.trim()},
+        ${input.sourceLanguage},
+        ${input.targetText.trim()},
+        ${input.targetLanguage},
+        ${input.partOfSpeech},
+        ${input.nounGender},
+        ${input.imagePrompt ?? ""},
+        ${imageData},
+        ${DEFAULT_ADAPTIVE_LEARNING_SCORE},
+        0,
+        0,
+        0,
+        ${now},
+        ${now},
+        NULL,
+        NULL
+      )
+      RETURNING *
+    `;
+
+    const row = rows[0];
+    return row ? mapRow(row) : null;
+  });
+}
+
+export async function updateFlashcardReviewState(
   userId: number,
   id: number,
   updates: {
@@ -181,87 +213,76 @@ export function updateFlashcardReviewState(
     lastResult: ReviewResult;
   }
 ) {
-  db.prepare(
-    `
-      UPDATE flashcards
-      SET weight = ?,
-          review_count = ?,
-          mistake_count = ?,
-          consecutive_correct = ?,
-          last_reviewed_at = ?,
-          last_result = ?,
-          updated_at = ?
-      WHERE user_id = ? AND id = ?
-    `
-  ).run(
-    updates.weight,
-    updates.reviewCount,
-    updates.mistakeCount,
-    updates.consecutiveCorrect,
-    updates.lastReviewedAt,
-    updates.lastResult,
-    new Date().toISOString(),
-    userId,
-    id
-  );
+  const updatedAt = new Date().toISOString();
+  const rows = await db<FlashcardRow[]>`
+    UPDATE flashcards
+    SET weight = ${updates.weight},
+        review_count = ${updates.reviewCount},
+        mistake_count = ${updates.mistakeCount},
+        consecutive_correct = ${updates.consecutiveCorrect},
+        last_reviewed_at = ${updates.lastReviewedAt},
+        last_result = ${updates.lastResult},
+        updated_at = ${updatedAt}
+    WHERE user_id = ${userId} AND id = ${id}
+    RETURNING *
+  `;
 
-  return getFlashcardById(userId, id);
+  const row = rows[0];
+  return row ? mapRow(row) : null;
 }
 
-export function deleteFlashcard(userId: number, id: number) {
-  const info = db
-    .prepare("UPDATE flashcards SET is_active = 0, weight = 1, updated_at = ? WHERE user_id = ? AND id = ? AND is_active = 1")
-    .run(new Date().toISOString(), userId, id);
-  return info.changes > 0;
+export async function deleteFlashcard(userId: number, id: number) {
+  const updatedAt = new Date().toISOString();
+  const rows = await db<{ id: number }[]>`
+    UPDATE flashcards
+    SET is_active = FALSE,
+        weight = 1,
+        updated_at = ${updatedAt}
+    WHERE user_id = ${userId} AND id = ${id} AND is_active = TRUE
+    RETURNING id
+  `;
+
+  return rows.length > 0;
 }
 
-export function getDeckStats(userId: number): DeckStats {
-  const totals = db
-    .prepare(
-      `
-        SELECT
-          COUNT(*) AS total_cards,
-          AVG(weight) AS average_weight,
-          SUM(CASE WHEN weight <= 0.35 THEN 1 ELSE 0 END) AS struggling_cards
-        FROM flashcards
-        WHERE user_id = ? AND is_active = 1
-      `
-    )
-    .get(userId) as {
-    total_cards: number;
-    average_weight: number | null;
-    struggling_cards: number | null;
+export async function getDeckStats(userId: number): Promise<DeckStats> {
+  const totalsRows = await db<DeckTotalsRow[]>`
+    SELECT
+      COUNT(*)::int AS total_cards,
+      COALESCE(AVG(weight), 0)::float8 AS average_weight,
+      COUNT(*) FILTER (WHERE weight <= 0.35)::int AS struggling_cards
+    FROM flashcards
+    WHERE user_id = ${userId} AND is_active = TRUE
+  `;
+
+  const dueSoonRows = await db<CountRow[]>`
+    SELECT COUNT(*)::int AS count
+    FROM flashcards
+    WHERE user_id = ${userId}
+      AND is_active = TRUE
+      AND (
+        last_reviewed_at IS NULL
+        OR last_reviewed_at <= NOW() - INTERVAL '30 minutes'
+      )
+  `;
+
+  const learnedRows = await db<CountRow[]>`
+    SELECT COUNT(*)::int AS count
+    FROM flashcards
+    WHERE user_id = ${userId} AND weight > 0.8
+  `;
+
+  const totals = totalsRows[0] ?? {
+    total_cards: 0,
+    average_weight: 0,
+    struggling_cards: 0
   };
-
-  const dueSoon = db
-    .prepare(
-      `
-        SELECT COUNT(*) AS due_soon
-        FROM flashcards
-        WHERE user_id = ? AND is_active = 1
-          AND (
-            last_reviewed_at IS NULL
-            OR datetime(last_reviewed_at) <= datetime('now', '-30 minutes')
-          )
-      `
-    )
-    .get(userId) as { due_soon: number };
-
-  const learned = db
-    .prepare(
-      `
-        SELECT COUNT(*) AS learned_words
-        FROM flashcards
-        WHERE user_id = ? AND weight > 0.8
-      `
-    )
-    .get(userId) as { learned_words: number };
 
   return {
     totalCards: totals.total_cards,
-    dueSoon: dueSoon.due_soon,
-    struggling: totals.struggling_cards ?? 0,
-    averageWeight: Number((totals.average_weight ?? 0).toFixed(2)),
-    learnedWords: learned.learned_words
+    dueSoon: dueSoonRows[0]?.count ?? 0,
+    struggling: totals.struggling_cards,
+    averageWeight: Number(totals.average_weight ?? 0),
+    learnedWords: learnedRows[0]?.count ?? 0
   };
 }

@@ -5,7 +5,7 @@ WordSketch is a small full-stack study app for translating between English and H
 ## Stack
 
 - `client`: React + Vite + TypeScript
-- `server`: Express + TypeScript + SQLite (`better-sqlite3`)
+- `server`: Express + TypeScript + Neon Postgres
 - `shared`: shared API contracts and types
 
 ## Development
@@ -38,10 +38,19 @@ WordSketch is a small full-stack study app for translating between English and H
 If `server/.env` does not contain an API key, the app runs in mock mode:
 
 - translation returns an explicit mock translation
-- image generation writes a local SVG placeholder illustration
+- image generation returns a placeholder illustration
 
 In live mode, Hebrew translations are requested with nikud.
 Speech playback uses OpenAI audio and is cached locally after the first generation so replay does not recompute.
+
+## Database
+
+The server expects Neon/Postgres connection strings:
+
+- `OOLPAN_STORAGE_DATABASE_URL`: pooled runtime connection
+- `OOLPAN_STORAGE_DATABASE_URL_UNPOOLED`: unpooled connection for schema setup
+
+The Vercel Neon integration can provide different values for development and production while keeping the same variable names.
 
 For live mode with the official OpenAI API, set:
 

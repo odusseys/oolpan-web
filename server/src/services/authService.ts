@@ -31,12 +31,12 @@ function buildGoogleUsername(name: string | null | undefined, email: string | nu
   return "google-user";
 }
 
-function makeAvailableGoogleUsername(name: string | null | undefined, email: string | null | undefined) {
+async function makeAvailableGoogleUsername(name: string | null | undefined, email: string | null | undefined) {
   const baseUsername = buildGoogleUsername(name, email);
   let candidate = baseUsername;
   let suffix = 2;
 
-  while (getUserByUsername(candidate)) {
+  while (await getUserByUsername(candidate)) {
     const suffixText = `-${suffix}`;
     const stem = baseUsername.slice(0, Math.max(1, GOOGLE_USERNAME_MAX_LENGTH - suffixText.length));
     candidate = `${stem}${suffixText}`;
@@ -46,14 +46,14 @@ function makeAvailableGoogleUsername(name: string | null | undefined, email: str
   return candidate;
 }
 
-export function registerUser(username: string) {
-  const existing = getUserByUsername(username);
+export async function registerUser(username: string) {
+  const existing = await getUserByUsername(username);
   if (existing) {
     throw new Error("That username is already taken");
   }
 
   const defaultPassword = generateDefaultPassword();
-  const created = createUser({
+  const created = await createUser({
     username,
     passwordHash: hashPassword(defaultPassword),
     authProvider: "local"
@@ -62,7 +62,7 @@ export function registerUser(username: string) {
     throw new Error("Could not create user");
   }
 
-  const sessionToken = createSession(created.user.id);
+  const sessionToken = await createSession(created.user.id);
 
   return {
     user: created.user,
@@ -71,8 +71,8 @@ export function registerUser(username: string) {
   };
 }
 
-export function loginUser(username: string, password: string) {
-  const existing = getUserByUsername(username);
+export async function loginUser(username: string, password: string) {
+  const existing = await getUserByUsername(username);
   if (!existing) {
     throw new Error("Invalid username or password");
   }
@@ -85,7 +85,7 @@ export function loginUser(username: string, password: string) {
     throw new Error("Invalid username or password");
   }
 
-  const sessionToken = createSession(existing.user.id);
+  const sessionToken = await createSession(existing.user.id);
 
   return {
     user: existing.user,
@@ -93,12 +93,12 @@ export function loginUser(username: string, password: string) {
   };
 }
 
-export function getUserFromSessionToken(token: string) {
+export async function getUserFromSessionToken(token: string) {
   return getSessionUser(token);
 }
 
-export function logoutSession(token: string) {
-  deleteSession(token);
+export async function logoutSession(token: string) {
+  await deleteSession(token);
 }
 
 export function getGoogleAuthConfig() {
@@ -127,17 +127,17 @@ export async function loginWithGoogle(credential: string) {
     throw new Error("Your Google email address is not verified");
   }
 
-  const existing = getUserByGoogleSub(payload.sub);
+  const existing = await getUserByGoogleSub(payload.sub);
   if (existing) {
-    const sessionToken = createSession(existing.user.id);
+    const sessionToken = await createSession(existing.user.id);
     return {
       user: existing.user,
       sessionToken
     };
   }
 
-  const created = createUser({
-    username: makeAvailableGoogleUsername(payload.name, payload.email),
+  const created = await createUser({
+    username: await makeAvailableGoogleUsername(payload.name, payload.email),
     passwordHash: "",
     authProvider: "google",
     googleSub: payload.sub,
@@ -148,7 +148,7 @@ export async function loginWithGoogle(credential: string) {
     throw new Error("Could not create Google account");
   }
 
-  const sessionToken = createSession(created.user.id);
+  const sessionToken = await createSession(created.user.id);
   return {
     user: created.user,
     sessionToken
