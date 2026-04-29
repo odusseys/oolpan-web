@@ -4,10 +4,10 @@ import type {
   DeleteFlashcardResponse,
   ReviewRequest,
   ReviewResponse,
+  SpeechRequest,
   StudyCard,
   SuggestionsResponse
 } from "@study/shared";
-import { appConfig } from "../config.js";
 import {
   createFlashcard,
   deleteFlashcard,
@@ -24,8 +24,8 @@ import { createAiClient } from "./aiClient.js";
 const aiClient = createAiClient();
 const lastServedFlashcardIds = new Map<number, number | null>();
 
-function toImageUrl(imagePath: string | null) {
-  return imagePath ? `/assets/${imagePath}` : null;
+function toImageUrl(imageData: string | null) {
+  return imageData;
 }
 
 function toStudyCard(card: NonNullable<ReturnType<typeof getFlashcardById>>): StudyCard {
@@ -38,14 +38,14 @@ function toStudyCard(card: NonNullable<ReturnType<typeof getFlashcardById>>): St
     promptLanguage: promptSide === "source" ? card.sourceLanguage : card.targetLanguage,
     answerText: promptSide === "source" ? card.targetText : card.sourceText,
     answerLanguage: promptSide === "source" ? card.targetLanguage : card.sourceLanguage,
-    imageUrl: toImageUrl(card.imagePath),
+    imageUrl: toImageUrl(card.imageData),
     samplingWeight: 0
   };
 }
 
 export async function createFlashcardWithImage(userId: number, input: CreateFlashcardRequest) {
   const existing = findFlashcardByPhrase(userId, input);
-  if (existing?.imagePath && existing.isActive) {
+  if (existing?.imageData && existing.isActive) {
     return {
       card: existing,
       stats: getDeckStats(userId)
@@ -59,27 +59,37 @@ export async function createFlashcardWithImage(userId: number, input: CreateFlas
       targetText: input.targetText,
       targetLanguage: input.targetLanguage
     }));
-  const generated = existing?.imagePath ? null : await aiClient.generateIllustration(imagePrompt);
-  const saved = createFlashcard(userId, { ...input, imagePrompt }, generated?.relativePath ?? null);
+  const generated = existing?.imageData ? null : await aiClient.generateIllustration(imagePrompt);
+  const saved = createFlashcard(userId, { ...input, imagePrompt }, generated?.dataUrl ?? null);
 
   if (!saved) {
     throw new Error("Could not create flashcard");
   }
 
   return {
-    card: {
-      ...saved,
-      imagePath: saved.imagePath
-    },
+    card: saved,
     stats: getDeckStats(userId)
   };
 }
 
 export function getNextStudyCard(userId: number, excludedIds: number[] = []) {
+  const cards = listFlashcards(userId);
+  if (cards.length === 1) {
+    const onlyCard = cards[0];
+    if (!onlyCard) {
+      return null;
+    }
+
+    const singleCard = toStudyCard(onlyCard);
+    singleCard.samplingWeight = pickWeightedRandom(cards, new Date(), [])?.samplingWeight ?? 0;
+    lastServedFlashcardIds.set(userId, singleCard.id);
+    return singleCard;
+  }
+
   const lastServedFlashcardId = lastServedFlashcardIds.get(userId) ?? null;
   const effectiveExcludedIds =
     lastServedFlashcardId !== null ? Array.from(new Set([...excludedIds, lastServedFlashcardId])) : excludedIds;
-  const picked = pickWeightedRandom(listFlashcards(userId), new Date(), effectiveExcludedIds);
+  const picked = pickWeightedRandom(cards, new Date(), effectiveExcludedIds) ?? pickWeightedRandom(cards, new Date(), excludedIds);
   if (!picked) {
     return null;
   }
@@ -100,6 +110,10 @@ export function getAiMode() {
 
 export async function translatePhrase(request: { text: string; sourceLanguage: "en" | "he"; targetLanguage: "en" | "he" }) {
   return aiClient.translate(request);
+}
+
+export async function generateSpeech(request: SpeechRequest) {
+  return aiClient.generateSpeech(request);
 }
 
 export async function suggestFlashcards(

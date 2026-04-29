@@ -41,6 +41,7 @@ If `server/.env` does not contain an API key, the app runs in mock mode:
 - image generation writes a local SVG placeholder illustration
 
 In live mode, Hebrew translations are requested with nikud.
+Speech playback uses OpenAI audio and is cached locally after the first generation so replay does not recompute.
 
 For live mode with the official OpenAI API, set:
 
@@ -50,10 +51,16 @@ For image generation, this app now uses FAL Flux Schnell. Set:
 
 - `FAL_KEY`
 
+For Google sign-in, set:
+
+- `GOOGLE_CLIENT_ID`
+
 The defaults are already set for local development:
 
 - `OPENAI_BASE_URL=https://api.openai.com/v1`
 - `OPENAI_TEXT_MODEL=gpt-5.4-mini`
+- `OPENAI_AUDIO_MODEL=gpt-4o-mini-tts`
+- `OPENAI_AUDIO_VOICE=cedar`
 - `FAL_IMAGE_MODEL=fal-ai/flux/schnell`
 
 You can still override text and image endpoints separately with the older provider-style variables:

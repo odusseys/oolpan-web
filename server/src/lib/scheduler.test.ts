@@ -12,7 +12,7 @@ function makeCard(overrides: Partial<FlashcardRecord> = {}): FlashcardRecord {
     partOfSpeech: "noun",
     nounGender: "masculine",
     imagePrompt: "book on a table",
-    imagePath: null,
+    imageData: null,
     weight: 1,
     reviewCount: 0,
     mistakeCount: 0,

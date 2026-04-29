@@ -9,9 +9,13 @@ type StudyPanelProps = {
   isBusy: boolean;
   pendingReviewResult: "oops" | "got_it" | null;
   isRemoving: boolean;
+  loadingAudioKey: string | null;
+  autoSpeakHebrew: boolean;
   onReveal: () => void;
   onReview: (result: "oops" | "got_it") => void;
   onRemove: () => void;
+  onToggleAutoSpeakHebrew: () => void;
+  onSpeak: (key: string, text: string, language: AppLanguage) => void;
 };
 
 export function StudyPanel({
@@ -21,9 +25,13 @@ export function StudyPanel({
   isBusy,
   pendingReviewResult,
   isRemoving,
+  loadingAudioKey,
+  autoSpeakHebrew,
   onReveal,
   onReview,
-  onRemove
+  onRemove,
+  onToggleAutoSpeakHebrew,
+  onSpeak
 }: StudyPanelProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -32,10 +40,20 @@ export function StudyPanel({
   }, [card?.id]);
 
   const score = card ? card.weight.toFixed(2) : null;
+  const promptAudioKey = card ? `flashcard:${card.id}:prompt:${card.promptLanguage}:${card.promptText}` : null;
+  const answerAudioKey = card ? `flashcard:${card.id}:answer:${card.answerLanguage}:${card.answerText}` : null;
+  const canSpeakPrompt = card?.promptLanguage === "he";
+  const canSpeakAnswer = card?.answerLanguage === "he";
 
   return (
     <section className="panel review-panel">
-      <h2>{t(uiLanguage, "studyHeading")}</h2>
+      <div className="study-panel-header">
+        <h2>{t(uiLanguage, "studyHeading")}</h2>
+        <label className="auto-speak-toggle">
+          <input type="checkbox" checked={autoSpeakHebrew} onChange={onToggleAutoSpeakHebrew} />
+          <span>{t(uiLanguage, "autoSpeakHebrew")}</span>
+        </label>
+      </div>
 
       {!card ? (
         <div className="empty-state">{t(uiLanguage, "studyEmpty")}</div>
@@ -59,6 +77,10 @@ export function StudyPanel({
                     <span>{t(uiLanguage, "flashcardScore")}</span>
                     <strong>{score}</strong>
                   </div>
+                  <div className="menu-description">
+                    <span className="menu-description-label">{t(uiLanguage, "flashcardImageCue")}</span>
+                    <p>{card.imagePrompt}</p>
+                  </div>
                   <button className="menu-action" type="button" disabled={isBusy} onClick={onRemove}>
                     <span className="button-content">
                       {isRemoving ? <span className="button-spinner" aria-hidden="true" /> : null}
@@ -75,21 +97,73 @@ export function StudyPanel({
               {isRevealed ? (
                 <div className="revealed-compare">
                   <div className="revealed-column">
-                    <p className="prompt-text prompt-text-revealed" dir={card.promptLanguage === "he" ? "rtl" : "ltr"}>
-                      {card.promptText}
-                    </p>
+                    <div className="spoken-line">
+                      <p className="prompt-text prompt-text-revealed" dir={card.promptLanguage === "he" ? "rtl" : "ltr"}>
+                        {card.promptText}
+                      </p>
+                      {canSpeakPrompt ? (
+                        <button
+                          className="icon-speak-button"
+                          type="button"
+                          aria-label={t(uiLanguage, "playAudio")}
+                          title={t(uiLanguage, "playAudio")}
+                          disabled={isBusy || !promptAudioKey || loadingAudioKey !== null}
+                          onClick={() => promptAudioKey && onSpeak(promptAudioKey, card.promptText, card.promptLanguage)}
+                        >
+                          {loadingAudioKey === promptAudioKey ? (
+                            <span className="button-spinner" aria-hidden="true" />
+                          ) : (
+                            <span aria-hidden="true">🔊</span>
+                          )}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="revealed-divider" aria-hidden="true" />
                   <div className="revealed-column">
-                    <div className="answer-block">
+                    <div className="answer-block spoken-line">
                       <p dir={card.answerLanguage === "he" ? "rtl" : "ltr"}>{card.answerText}</p>
+                      {canSpeakAnswer ? (
+                        <button
+                          className="icon-speak-button"
+                          type="button"
+                          aria-label={t(uiLanguage, "playAudio")}
+                          title={t(uiLanguage, "playAudio")}
+                          disabled={isBusy || !answerAudioKey || loadingAudioKey !== null}
+                          onClick={() => answerAudioKey && onSpeak(answerAudioKey, card.answerText, card.answerLanguage)}
+                        >
+                          {loadingAudioKey === answerAudioKey ? (
+                            <span className="button-spinner" aria-hidden="true" />
+                          ) : (
+                            <span aria-hidden="true">🔊</span>
+                          )}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
               ) : (
-                <p className="prompt-text" dir={card.promptLanguage === "he" ? "rtl" : "ltr"}>
-                  {card.promptText}
-                </p>
+                <div className="spoken-line spoken-line-centered">
+                  <p className="prompt-text" dir={card.promptLanguage === "he" ? "rtl" : "ltr"}>
+                    {card.promptText}
+                  </p>
+                  {canSpeakPrompt ? (
+                    <button
+                      className="icon-speak-button"
+                      type="button"
+                      aria-label={t(uiLanguage, "playAudio")}
+                      title={t(uiLanguage, "playAudio")}
+                      disabled={isBusy || !promptAudioKey || loadingAudioKey !== null}
+                      onClick={() => promptAudioKey && onSpeak(promptAudioKey, card.promptText, card.promptLanguage)}
+                    >
+                      {loadingAudioKey === promptAudioKey ? (
+                        <span className="button-spinner" aria-hidden="true" />
+                      ) : (
+                        <span aria-hidden="true">🔊</span>
+                      )}
+                    </button>
+                  ) : null}
+                </div>
               )}
             </div>
           </div>

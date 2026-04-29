@@ -127,7 +127,7 @@ textarea {
 .app-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   margin-bottom: 12px;
   gap: 16px;
 }
@@ -145,6 +145,7 @@ textarea {
   align-items: center;
   gap: 14px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .brand-logo {
@@ -160,6 +161,7 @@ textarea {
   gap: 8px;
   min-height: 58px;
   color: #4e3867;
+  position: relative;
 }
 
 .learned-counter-label {
@@ -170,6 +172,56 @@ textarea {
 .learned-counter strong {
   font-size: 1.15rem;
   color: #2d1b3c;
+}
+
+.help-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.help-trigger {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(98, 72, 132, 0.42);
+  background: rgba(255, 255, 255, 0.24);
+  color: #5f477a;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.help-modal {
+  width: min(420px, 100%);
+  padding: 16px 16px 14px;
+}
+
+.help-modal-copy {
+  display: grid;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding-left: 1.4rem;
+}
+
+.help-modal-copy li {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.5;
+  color: #50386c;
+  padding-left: 4px;
+}
+
+.help-modal .confirm-copy h2 {
+  margin-bottom: 2px;
+}
+
+.help-modal .confirm-actions {
+  margin-top: 12px;
+  grid-template-columns: 1fr;
 }
 
 .toast-stack {
@@ -249,8 +301,121 @@ textarea {
   font-size: 0.92rem;
 }
 
+.auth-password-warning {
+  margin: 0;
+  color: #b33c5b;
+  font-size: clamp(1.08rem, 2vw, 1.3rem);
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+}
+
 .auth-submit-button {
   width: 100%;
+}
+
+.auth-divider {
+  display: grid;
+  place-items: center;
+  margin: 2px 0;
+  color: #7a6295;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.auth-divider span {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+}
+
+.auth-divider span::before,
+.auth-divider span::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 84px;
+  height: 1px;
+  background: rgba(126, 96, 166, 0.2);
+}
+
+.auth-divider span::before {
+  right: 100%;
+}
+
+.auth-divider span::after {
+  left: 100%;
+}
+
+.google-auth-block {
+  display: grid;
+  gap: 8px;
+}
+
+.google-auth-loading {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #6d5788;
+}
+
+.google-auth-fallback-button {
+  width: 100%;
+}
+
+.google-signin-button {
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+}
+
+.google-signin-button > div,
+.google-signin-button iframe {
+  max-width: 100%;
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.auth-inline-button {
+  width: 100%;
+}
+
+.password-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.24);
+  color: #322046;
+  backdrop-filter: blur(24px) saturate(1.08);
+  -webkit-backdrop-filter: blur(24px) saturate(1.08);
+}
+
+.password-card-label {
+  font-size: 0.88rem;
+  color: #71588c;
+}
+
+.password-card strong {
+  font-size: clamp(1.2rem, 2vw, 1.45rem);
+  letter-spacing: 0;
+  word-break: break-word;
+}
+
+.password-card-copy-button {
+  justify-self: start;
+  min-height: 42px;
+  padding: 0 14px;
 }
 
 .password-banner {
@@ -322,20 +487,29 @@ textarea {
   color: #241733;
 }
 
-.top-action-button {
-  min-width: 182px;
-  background: linear-gradient(180deg, rgba(187, 145, 255, 0.88), rgba(145, 108, 224, 0.93));
-  color: #ffffff;
-  box-shadow: 0 10px 22px rgba(145, 108, 224, 0.18);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
 .button-emoji {
   font-size: 1rem;
   line-height: 1;
+}
+
+.header-menu-shell {
+  position: relative;
+  z-index: 8;
+  flex: 0 0 auto;
+}
+
+.header-menu-trigger {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+}
+
+.header-menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 156px;
+  z-index: 12;
 }
 
 .main-grid {
@@ -366,6 +540,35 @@ textarea {
   margin: 0 0 10px;
   font-size: 1.3rem;
   font-weight: 700;
+}
+
+.study-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.study-panel-header h2 {
+  margin: 0;
+}
+
+.auto-speak-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: #654d82;
+  font-size: 0.86rem;
+  text-align: right;
+}
+
+.auto-speak-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #8d6ae0;
+  margin: 0;
 }
 
 .section-row {
@@ -465,10 +668,21 @@ textarea {
   -webkit-backdrop-filter: blur(24px) saturate(1.08);
 }
 
+.surface-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .surface-language {
   margin-bottom: 4px;
   font-size: 0.88rem;
   color: #704f88;
+}
+
+.surface-header .surface-language {
+  margin-bottom: 0;
 }
 
 .translation-surface textarea {
@@ -492,6 +706,8 @@ textarea {
 
 .translation-output textarea {
   color: #3d2454;
+  font-size: clamp(1.14rem, 2vw, 1.28rem);
+  line-height: 1.4;
 }
 
 .swap-row {
@@ -568,6 +784,27 @@ textarea {
   flex: 0 0 auto;
 }
 
+.icon-speak-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid rgba(112, 83, 154, 0.22);
+  background: rgba(255, 255, 255, 0.48);
+  color: #684e8b;
+  box-shadow: 0 8px 18px rgba(126, 94, 163, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.icon-speak-button .button-spinner {
+  width: 14px;
+  height: 14px;
+}
+
 .primary-button {
   background: linear-gradient(180deg, rgba(187, 145, 255, 0.88), rgba(145, 108, 224, 0.93));
   color: #ffffff;
@@ -577,6 +814,20 @@ textarea {
 .secondary-button {
   background: rgba(255, 255, 255, 0.15);
   color: #42295d;
+}
+
+.secondary-button.top-action-button {
+  min-width: 182px;
+  min-height: 46px;
+  padding: 0 16px;
+  border-color: rgba(124, 86, 205, 0.32);
+  background: #8d6ae0 !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 22px rgba(141, 106, 224, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
 .success-button {
@@ -667,6 +918,32 @@ textarea {
   text-align: center;
 }
 
+.spoken-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.spoken-line .prompt-text,
+.spoken-line .answer-block p,
+.spoken-line > p {
+  flex: 1 1 auto;
+}
+
+.spoken-line-centered {
+  justify-content: center;
+}
+
+.spoken-line-centered .prompt-text,
+.spoken-line-centered > p {
+  flex: 0 1 auto;
+}
+
+.spoken-line .icon-speak-button {
+  margin-top: 2px;
+}
+
 .prompt-text,
 .answer-block p {
   margin: 0;
@@ -723,33 +1000,38 @@ textarea {
 
 .study-card-menu {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
 }
 
 .menu-trigger {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.14);
-  color: #5a3f77;
-  font-size: 1.2rem;
+  border: 1px solid rgba(95, 69, 127, 0.34);
+  background: rgba(255, 250, 252, 0.9);
+  color: #4f356e;
+  font-size: 1.3rem;
   line-height: 1;
+  box-shadow: 0 10px 24px rgba(126, 94, 163, 0.16);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .menu-popover {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 160px;
-  padding: 6px;
+  min-width: 300px;
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 8px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 250, 252, 0.92);
-  box-shadow: 0 14px 30px rgba(126, 94, 163, 0.15);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 250, 252, 0.96);
+  box-shadow: 0 18px 34px rgba(126, 94, 163, 0.18);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .menu-metric {
@@ -767,9 +1049,27 @@ textarea {
   color: #332045;
 }
 
+.menu-description {
+  display: grid;
+  gap: 6px;
+  padding: 6px 8px 10px;
+}
+
+.menu-description-label {
+  font-size: 0.8rem;
+  color: #73598f;
+}
+
+.menu-description p {
+  margin: 0;
+  color: #402a59;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
 .menu-action {
   width: 100%;
-  min-height: 34px;
+  min-height: 38px;
   border: 0;
   border-radius: 8px;
   background: rgba(255, 228, 233, 0.88);
@@ -780,6 +1080,19 @@ textarea {
 
 .menu-action .button-content {
   justify-content: flex-start;
+}
+
+.header-menu-action {
+  min-height: 44px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
 }
 
 .modal-backdrop {
@@ -816,6 +1129,25 @@ textarea {
 
 .modal-header h2 {
   margin: 0 0 2px;
+}
+
+.confirm-panel {
+  width: min(440px, 100%);
+}
+
+.confirm-copy h2 {
+  margin: 0 0 6px;
+}
+
+.confirm-body {
+  margin: 0;
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
 }
 
 .modal-close-button {
@@ -930,6 +1262,21 @@ textarea {
     width: min(58vw, 180px);
   }
 
+  .brand-lockup {
+    width: 100%;
+    flex-direction: column;
+    align-items: start;
+  }
+
+  .study-panel-header {
+    align-items: start;
+  }
+
+  .auto-speak-toggle {
+    max-width: 46%;
+    line-height: 1.25;
+  }
+
   .learned-counter,
   .modal-close-button {
     width: 100%;
@@ -958,6 +1305,11 @@ textarea {
     align-items: stretch;
   }
 
+  .auth-actions,
+  .confirm-actions {
+    grid-template-columns: 1fr;
+  }
+
   .translate-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -965,6 +1317,15 @@ textarea {
   .translator-panel {
     width: 100%;
     min-width: 0;
+  }
+
+  .header-menu-shell {
+    align-self: flex-end;
+  }
+
+  .header-menu-popover {
+    top: calc(100% + 8px);
+    right: 0;
   }
 }
 

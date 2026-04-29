@@ -4,6 +4,8 @@ import type {
   DeckStats,
   DeleteFlashcardResponse,
   FlashcardRecord,
+  GoogleAuthConfigResponse,
+  GoogleAuthRequest,
   HealthResponse,
   LoginRequest,
   LoginResponse,
@@ -11,6 +13,8 @@ import type {
   RegisterUserResponse,
   ReviewRequest,
   ReviewResponse,
+  SpeechRequest,
+  SpeechResponse,
   StudyCard,
   SuggestionsResponse,
   TranslationRequest,
@@ -86,6 +90,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload)
     }),
+  googleAuthConfig: () => request<GoogleAuthConfigResponse>("/api/auth/google/config"),
+  loginWithGoogle: (payload: GoogleAuthRequest) =>
+    request<LoginResponse>("/api/auth/google", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
   me: () => request<CurrentUserResponse>("/api/auth/me"),
   logout: () =>
     request<void>("/api/auth/logout", {
@@ -93,6 +103,11 @@ export const api = {
     }),
   translate: (payload: TranslationRequest) =>
     request<TranslationResult>("/api/translate", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  speak: (payload: SpeechRequest) =>
+    request<SpeechResponse>("/api/audio/speech", {
       method: "POST",
       body: JSON.stringify(payload)
     }),

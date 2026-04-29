@@ -2,13 +2,16 @@ import { Router, type Request } from "express";
 import { z } from "zod";
 import {
   createFlashcardRequestSchema,
+  googleAuthRequestSchema,
   loginRequestSchema,
   registerUserRequestSchema,
   reviewRequestSchema,
+  speechRequestSchema,
   translationRequestSchema
 } from "./schemas.js";
 import {
   createFlashcardWithImage,
+  generateSpeech,
   getAiMode,
   getNextStudyCard,
   removeFlashcard,
@@ -17,7 +20,14 @@ import {
   reviewCard,
   translatePhrase
 } from "../services/flashcardService.js";
-import { getUserFromSessionToken, loginUser, logoutSession, registerUser } from "../services/authService.js";
+import {
+  getGoogleAuthConfig,
+  getUserFromSessionToken,
+  loginUser,
+  loginWithGoogle,
+  logoutSession,
+  registerUser
+} from "../services/authService.js";
 
 export const apiRouter = Router();
 
@@ -52,6 +62,19 @@ apiRouter.post("/auth/login", (req, res, next) => {
   try {
     const payload = loginRequestSchema.parse(req.body);
     res.json(loginUser(payload.username, payload.password));
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.get("/auth/google/config", (_req, res) => {
+  res.json(getGoogleAuthConfig());
+});
+
+apiRouter.post("/auth/google", async (req, res, next) => {
+  try {
+    const payload = googleAuthRequestSchema.parse(req.body);
+    res.json(await loginWithGoogle(payload.credential));
   } catch (error) {
     next(error);
   }
@@ -124,6 +147,21 @@ apiRouter.post("/translate", async (req, res, next) => {
     const payload = translationRequestSchema.parse(req.body);
     const result = await translatePhrase(payload);
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+apiRouter.post("/audio/speech", async (req, res, next) => {
+  try {
+    const { user } = getRequestUser(req);
+    if (!user) {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
+    const payload = speechRequestSchema.parse(req.body);
+    res.json(await generateSpeech(payload));
   } catch (error) {
     next(error);
   }

@@ -57,11 +57,20 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload)
     }),
+    googleAuthConfig: () => request("/api/auth/google/config"),
+    loginWithGoogle: (payload) => request("/api/auth/google", {
+        method: "POST",
+        body: JSON.stringify(payload)
+    }),
     me: () => request("/api/auth/me"),
     logout: () => request("/api/auth/logout", {
         method: "POST"
     }),
     translate: (payload) => request("/api/translate", {
+        method: "POST",
+        body: JSON.stringify(payload)
+    }),
+    speak: (payload) => request("/api/audio/speech", {
         method: "POST",
         body: JSON.stringify(payload)
     }),

@@ -2,26 +2,73 @@ import type {
   AppLanguage,
   CreateFlashcardRequest,
   FlashcardRecord,
+  SpeechRequest,
+  SpeechResponse,
   SuggestedFlashcard,
   TranslationRequest,
   TranslationResult
 } from "@study/shared";
-import { randomUUID } from "node:crypto";
-import { writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { Jimp } from "jimp";
 import { z } from "zod";
 import { appConfig } from "../config.js";
 import { extractJsonObject } from "../lib/json.js";
-import { ensureDir } from "../lib/paths.js";
 
 type GeneratedImage = {
-  relativePath: string;
+  dataUrl: string;
 };
+
+type GeneratedSpeech = SpeechResponse;
 
 const IMAGE_STYLE_DESCRIPTOR =
   "cel shaded Pixar aesthetic, soft cinematic volumetric lighting, vibrant colors, whimsical, cel shading, hybrid 2D/3D aesthetic, simple";
 const IMAGE_SCENE_REQUIREMENTS =
   "Describe a detailed scene with a clear subject, visible environment, layered background elements, and non-solid surroundings. Never include written text, letters, captions, labels, signage, or typography anywhere in the image.";
+const ADULT_CONTENT_REQUIREMENTS =
+  "If the vocabulary could be adult, sexual, intimate, or explicit in nature, use a metaphorical educational visual only. Do not include nudity, sexual acts, fetish elements, explicit body focus, intimate touching, underwear scenes, or other adult imagery. Prefer symbolic objects, mood, weather, color, distance, or other indirect metaphors.";
+
+const ADULT_TERM_PATTERNS = [
+  /\bsex\b/i,
+  /\bsexual\b/i,
+  /\bsexy\b/i,
+  /\bnude\b/i,
+  /\bnaked\b/i,
+  /\berotic\b/i,
+  /\bintimate\b/i,
+  /\bkink\b/i,
+  /\bfetish\b/i,
+  /\bcondom\b/i,
+  /\bbreast\b/i,
+  /\bboob\b/i,
+  /\bpenis\b/i,
+  /\bvagina\b/i,
+  /\bgenital\b/i,
+  /\bclimax\b/i,
+  /\borgasm\b/i,
+  /\bmoan\b/i,
+  /\bseduce\b/i,
+  /\bbedroom\b/i,
+  /\blust\b/i,
+  /\bkiss\b/i,
+  /\bmake ?out\b/i,
+  /\bfuck\b/i,
+  /\bcock\b/i,
+  /\bdick\b/i,
+  /\bpussy\b/i,
+  /\bslut\b/i,
+  /\bwhore\b/i,
+  /\bporn\b/i,
+  /\bxxx\b/i,
+  /סקס/u,
+  /מיני/u,
+  /מיניות/u,
+  /עירום/u,
+  /אינטימי/u,
+  /אירוטי/u,
+  /נשיקה/u,
+  /זין/u,
+  /פות/u,
+  /אורגז/u
+];
 
 const translationResultSchema = z.object({
   translation: z.string().min(1)
@@ -61,22 +108,6 @@ function endpointUrl(baseUrl: string, path: string) {
   return new URL(path, normalizedBase);
 }
 
-function mimeTypeToExtension(mimeType: string | null | undefined) {
-  if (!mimeType) {
-    return "jpg";
-  }
-
-  if (mimeType.includes("png")) {
-    return "png";
-  }
-
-  if (mimeType.includes("webp")) {
-    return "webp";
-  }
-
-  return "jpg";
-}
-
 function parseImageSize(size: string) {
   const match = size.match(/^(\d+)x(\d+)$/);
   if (!match) {
@@ -104,8 +135,44 @@ function parseDataUri(dataUri: string) {
   };
 }
 
+async function resizeImageToDataUrl(imageBuffer: Buffer) {
+  const image = await Jimp.read(imageBuffer);
+  image.resize({ w: 512, h: 512 });
+  return image.getBase64("image/jpeg", { quality: 82 });
+}
+
+function createSilentWavBuffer(durationMs = 320, sampleRate = 24_000) {
+  const channels = 1;
+  const bitsPerSample = 16;
+  const bytesPerSample = bitsPerSample / 8;
+  const sampleCount = Math.max(1, Math.floor((sampleRate * durationMs) / 1000));
+  const dataSize = sampleCount * channels * bytesPerSample;
+  const buffer = Buffer.alloc(44 + dataSize);
+
+  buffer.write("RIFF", 0, "ascii");
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write("WAVE", 8, "ascii");
+  buffer.write("fmt ", 12, "ascii");
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(channels, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * channels * bytesPerSample, 28);
+  buffer.writeUInt16LE(channels * bytesPerSample, 32);
+  buffer.writeUInt16LE(bitsPerSample, 34);
+  buffer.write("data", 36, "ascii");
+  buffer.writeUInt32LE(dataSize, 40);
+
+  return buffer;
+}
+
 function withImageRequirements(prompt: string) {
   return `${prompt}. ${IMAGE_SCENE_REQUIREMENTS} Style: ${IMAGE_STYLE_DESCRIPTOR}.`;
+}
+
+function isPotentiallyAdultMeaning(input: FlashcardMeaning) {
+  const combined = [input.sourceText, input.targetText].join(" ");
+  return ADULT_TERM_PATTERNS.some((pattern) => pattern.test(combined));
 }
 
 function extractResponseOutputText(payload: unknown) {
@@ -186,18 +253,15 @@ class MockAiClient {
 
   async describeFlashcardScene(input: FlashcardMeaning) {
     const focusText = input.sourceLanguage === "en" ? input.sourceText : input.targetText;
-    return `A friendly detailed study-card scene that visualizes ${focusText}, with a clear environment and a rich non-solid background, with no text in the image`;
+    const adultSafety = isPotentiallyAdultMeaning(input)
+      ? ", rendered as a metaphorical non-explicit study image with symbolic objects and no adult elements"
+      : "";
+    return `A friendly detailed study-card scene that visualizes ${focusText}${adultSafety}, with a clear environment and a rich non-solid background, with no text in the image`;
   }
 
   async generateIllustration(prompt: string) {
-    ensureDir(appConfig.generatedAssetDir);
-
-    const fileName = `${randomUUID()}.svg`;
-    const relativePath = fileName;
-    const filePath = join(appConfig.generatedAssetDir, fileName);
-
     const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+      <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
         <defs>
           <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stop-color="#f7dff3" />
@@ -208,26 +272,32 @@ class MockAiClient {
             <stop offset="100%" stop-color="#d0c2ff" />
           </linearGradient>
         </defs>
-        <rect width="1024" height="1024" fill="url(#sky)" />
-        <circle cx="820" cy="190" r="110" fill="#fff6fd" opacity="0.9" />
-        <ellipse cx="512" cy="862" rx="380" ry="148" fill="url(#ground)" />
-        <ellipse cx="230" cy="300" rx="110" ry="58" fill="#ffffff" opacity="0.42" />
-        <ellipse cx="770" cy="328" rx="132" ry="64" fill="#ffffff" opacity="0.34" />
-        <circle cx="512" cy="420" r="116" fill="#f7c8b2" />
-        <rect x="384" y="520" width="256" height="214" rx="72" fill="#8d74e8" />
-        <rect x="314" y="560" width="110" height="210" rx="56" fill="#8d74e8" transform="rotate(18 314 560)" />
-        <rect x="600" y="560" width="110" height="210" rx="56" fill="#8d74e8" transform="rotate(-18 600 560)" />
-        <rect x="390" y="744" width="100" height="182" rx="54" fill="#6844a8" transform="rotate(8 390 744)" />
-        <rect x="534" y="744" width="100" height="182" rx="54" fill="#6844a8" transform="rotate(-8 534 744)" />
-        <circle cx="332" cy="256" r="34" fill="#ffbed8" />
-        <circle cx="696" cy="248" r="28" fill="#bda1ff" />
-        <circle cx="742" cy="540" r="24" fill="#ffd1ef" />
+        <rect width="512" height="512" fill="url(#sky)" />
+        <circle cx="410" cy="95" r="55" fill="#fff6fd" opacity="0.9" />
+        <ellipse cx="256" cy="430" rx="190" ry="74" fill="url(#ground)" />
+        <ellipse cx="115" cy="150" rx="55" ry="29" fill="#ffffff" opacity="0.42" />
+        <ellipse cx="385" cy="164" rx="66" ry="32" fill="#ffffff" opacity="0.34" />
+        <circle cx="256" cy="210" r="58" fill="#f7c8b2" />
+        <rect x="192" y="260" width="128" height="107" rx="36" fill="#8d74e8" />
+        <rect x="157" y="280" width="55" height="105" rx="28" fill="#8d74e8" transform="rotate(18 157 280)" />
+        <rect x="300" y="280" width="55" height="105" rx="28" fill="#8d74e8" transform="rotate(-18 300 280)" />
+        <rect x="195" y="372" width="50" height="91" rx="27" fill="#6844a8" transform="rotate(8 195 372)" />
+        <rect x="267" y="372" width="50" height="91" rx="27" fill="#6844a8" transform="rotate(-8 267 372)" />
+        <circle cx="166" cy="128" r="17" fill="#ffbed8" />
+        <circle cx="348" cy="124" r="14" fill="#bda1ff" />
+        <circle cx="371" cy="270" r="12" fill="#ffd1ef" />
       </svg>
     `.trim();
 
-    await writeFile(filePath, svg, "utf8");
+    return {
+      dataUrl: `data:image/svg+xml;base64,${Buffer.from(svg, "utf8").toString("base64")}`
+    };
+  }
 
-    return { relativePath };
+  async generateSpeech(request: SpeechRequest): Promise<GeneratedSpeech> {
+    return {
+      audioUrl: `data:audio/wav;base64,${createSilentWavBuffer().toString("base64")}`
+    };
   }
 
   async suggestRelatedFlashcards(
@@ -321,7 +391,8 @@ class OpenAiCompatibleAiClient {
       "Describe a single vivid scene that conveys the meaning of the word or phrase.",
       "Include foreground subject details plus environment and background details.",
       "Do not include any written text, letters, signage, captions, or labels in the image.",
-      "Never use a plain or solid-color background."
+      "Never use a plain or solid-color background.",
+      ADULT_CONTENT_REQUIREMENTS
     ].join(" ");
 
     const userPrompt = [
@@ -369,8 +440,6 @@ class OpenAiCompatibleAiClient {
       throw new Error("Missing image configuration");
     }
 
-    ensureDir(appConfig.generatedAssetDir);
-
     const response = await fetch(endpointUrl(appConfig.imageApiBaseUrl, "images/generations"), {
       method: "POST",
       headers: {
@@ -399,7 +468,6 @@ class OpenAiCompatibleAiClient {
     }
 
     let imageBuffer: Buffer;
-    let extension = "png";
 
     if (firstImage.b64_json) {
       imageBuffer = Buffer.from(firstImage.b64_json, "base64");
@@ -409,19 +477,48 @@ class OpenAiCompatibleAiClient {
         throw new Error(`Could not download generated image: ${imageResponse.status}`);
       }
 
-      const mimeType = imageResponse.headers.get("content-type") ?? "";
-      extension = mimeType.includes("jpeg") ? "jpg" : "png";
       imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
     } else {
       throw new Error("Image response did not include data");
     }
 
-    const fileName = `${randomUUID()}.${extension}`;
-    const relativePath = fileName;
-    const filePath = join(appConfig.generatedAssetDir, fileName);
-    await writeFile(filePath, imageBuffer);
+    return {
+      dataUrl: await resizeImageToDataUrl(imageBuffer)
+    };
+  }
 
-    return { relativePath };
+  async generateSpeech(request: SpeechRequest): Promise<GeneratedSpeech> {
+    if (!appConfig.audioApiBaseUrl || !appConfig.audioApiKey || !appConfig.audioModel || !appConfig.audioVoice) {
+      throw new Error("Missing audio configuration");
+    }
+
+    const trimmedText = request.text.trim();
+    const instructions = `Read exactly the provided text in ${languageName(request.language)}. Do not add, remove, explain, or complete anything.`;
+
+    const response = await fetch(endpointUrl(appConfig.audioApiBaseUrl, "audio/speech"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${appConfig.audioApiKey}`
+      },
+      body: JSON.stringify({
+        model: appConfig.audioModel,
+        voice: appConfig.audioVoice,
+        input: trimmedText,
+        instructions,
+        response_format: "mp3"
+      })
+    });
+
+    if (!response.ok) {
+      await throwApiError("Speech request", response);
+    }
+
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+
+    return {
+      audioUrl: `data:audio/mpeg;base64,${audioBuffer.toString("base64")}`
+    };
   }
 
   async suggestRelatedFlashcards(
@@ -550,8 +647,6 @@ async function generateWithFal(prompt: string): Promise<GeneratedImage> {
     throw new Error("Missing FAL configuration");
   }
 
-  ensureDir(appConfig.generatedAssetDir);
-
   const response = await fetch(`https://fal.run/${appConfig.falImageModel}`, {
     method: "POST",
     headers: {
@@ -586,28 +681,22 @@ async function generateWithFal(prompt: string): Promise<GeneratedImage> {
   }
 
   let imageBuffer: Buffer;
-  let extension = mimeTypeToExtension(firstImage.content_type);
 
   if (firstImage.url.startsWith("data:")) {
     const parsed = parseDataUri(firstImage.url);
     imageBuffer = parsed.buffer;
-    extension = mimeTypeToExtension(parsed.mimeType);
   } else {
     const imageResponse = await fetch(firstImage.url);
     if (!imageResponse.ok) {
       throw new Error(`Could not download generated FAL image: ${imageResponse.status}`);
     }
 
-    extension = mimeTypeToExtension(imageResponse.headers.get("content-type") ?? firstImage.content_type);
     imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
   }
 
-  const fileName = `${randomUUID()}.${extension}`;
-  const relativePath = fileName;
-  const filePath = join(appConfig.generatedAssetDir, fileName);
-  await writeFile(filePath, imageBuffer);
-
-  return { relativePath };
+  return {
+    dataUrl: await resizeImageToDataUrl(imageBuffer)
+  };
 }
 
 export function createAiClient() {

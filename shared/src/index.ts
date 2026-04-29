@@ -17,6 +17,15 @@ export interface TranslationRequest {
   targetLanguage: AppLanguage;
 }
 
+export interface SpeechRequest {
+  text: string;
+  language: AppLanguage;
+}
+
+export interface SpeechResponse {
+  audioUrl: string;
+}
+
 export interface TranslationResult {
   sourceText: string;
   sourceLanguage: AppLanguage;
@@ -40,7 +49,7 @@ export interface FlashcardRecord {
   partOfSpeech: PartOfSpeech;
   nounGender: NounGender | null;
   imagePrompt: string;
-  imagePath: string | null;
+  imageData: string | null;
   weight: number;
   reviewCount: number;
   mistakeCount: number;
@@ -100,10 +109,15 @@ export interface DeleteFlashcardResponse {
   stats: DeckStats;
 }
 
+export const authProviders = ["local", "google"] as const;
+export type AuthProvider = (typeof authProviders)[number];
+
 export interface User {
   id: number;
   username: string;
   createdAt: string;
+  authProvider: AuthProvider;
+  email: string | null;
 }
 
 export interface RegisterUserRequest {
@@ -124,6 +138,15 @@ export interface LoginRequest {
 export interface LoginResponse {
   user: User;
   sessionToken: string;
+}
+
+export interface GoogleAuthRequest {
+  credential: string;
+}
+
+export interface GoogleAuthConfigResponse {
+  enabled: boolean;
+  clientId: string | null;
 }
 
 export interface CurrentUserResponse {

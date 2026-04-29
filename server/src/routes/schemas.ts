@@ -4,9 +4,14 @@ import { z } from "zod";
 const languageSchema = z.enum(["en", "he"]);
 
 export const translationRequestSchema = z.object({
-  text: z.string().trim().min(1).max(240),
+  text: z.string().trim().min(1).max(1000),
   sourceLanguage: languageSchema,
   targetLanguage: languageSchema
+});
+
+export const speechRequestSchema = z.object({
+  text: z.string().trim().min(1).max(1000),
+  language: languageSchema
 });
 
 export const createFlashcardRequestSchema = z.object({
@@ -31,4 +36,8 @@ export const registerUserRequestSchema = z.object({
 export const loginRequestSchema = z.object({
   username: z.string().trim().min(1),
   password: z.string().min(1)
+});
+
+export const googleAuthRequestSchema = z.object({
+  credential: z.string().trim().min(1)
 });

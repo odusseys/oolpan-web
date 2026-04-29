@@ -18,7 +18,7 @@ type FlashcardRow = {
   part_of_speech: FlashcardRecord["partOfSpeech"];
   noun_gender: FlashcardRecord["nounGender"];
   image_prompt: string;
-  image_path: string | null;
+  image_data: string | null;
   weight: number;
   review_count: number;
   mistake_count: number;
@@ -40,7 +40,7 @@ function mapRow(row: FlashcardRow): FlashcardRecord {
     partOfSpeech: row.part_of_speech,
     nounGender: row.noun_gender,
     imagePrompt: row.image_prompt,
-    imagePath: row.image_path,
+    imageData: row.image_data,
     weight: row.weight,
     reviewCount: row.review_count,
     mistakeCount: row.mistake_count,
@@ -97,10 +97,10 @@ export function findFlashcardByPhrase(userId: number, translation: TranslationRe
   return row ? mapRow(row) : null;
 }
 
-export function createFlashcard(userId: number, input: CreateFlashcardRequest, imagePath: string | null) {
+export function createFlashcard(userId: number, input: CreateFlashcardRequest, imageData: string | null) {
   const existing = findFlashcardByPhrase(userId, input);
   if (existing) {
-    reactivateFlashcard(userId, existing.id, imagePath);
+    reactivateFlashcard(userId, existing.id, imageData);
     return getFlashcardById(userId, existing.id);
   }
 
@@ -117,7 +117,7 @@ export function createFlashcard(userId: number, input: CreateFlashcardRequest, i
           part_of_speech,
           noun_gender,
           image_prompt,
-          image_path,
+          image_data,
           weight,
           review_count,
           mistake_count,
@@ -139,7 +139,7 @@ export function createFlashcard(userId: number, input: CreateFlashcardRequest, i
       input.partOfSpeech,
       input.nounGender,
       input.imagePrompt,
-      imagePath,
+      imageData,
       DEFAULT_ADAPTIVE_LEARNING_SCORE,
       now,
       now
@@ -148,20 +148,17 @@ export function createFlashcard(userId: number, input: CreateFlashcardRequest, i
   return getFlashcardById(userId, Number(info.lastInsertRowid));
 }
 
-function updateFlashcardImage(userId: number, id: number, imagePath: string) {
-  db.prepare("UPDATE flashcards SET image_path = ?, updated_at = ? WHERE user_id = ? AND id = ?").run(
-    imagePath,
-    new Date().toISOString(),
-    userId,
-    id
-  );
-}
-
-function reactivateFlashcard(userId: number, id: number, imagePath: string | null) {
-  if (imagePath) {
+function reactivateFlashcard(userId: number, id: number, imageData: string | null) {
+  if (imageData) {
     db.prepare(
-      "UPDATE flashcards SET is_active = 1, image_path = COALESCE(image_path, ?), updated_at = ? WHERE user_id = ? AND id = ?"
-    ).run(imagePath, new Date().toISOString(), userId, id);
+      `
+        UPDATE flashcards
+        SET is_active = 1,
+            image_data = COALESCE(image_data, ?),
+            updated_at = ?
+        WHERE user_id = ? AND id = ?
+      `
+    ).run(imageData, new Date().toISOString(), userId, id);
     return;
   }
 
