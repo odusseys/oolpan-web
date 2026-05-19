@@ -25,6 +25,20 @@ const serverUrl = import.meta.env.VITE_SERVER_URL ?? "";
 const SESSION_STORAGE_KEY = "oolpan_session_token";
 let authToken = typeof window !== "undefined" ? window.localStorage.getItem(SESSION_STORAGE_KEY) : null;
 
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+export function isUnauthorizedError(error: unknown) {
+  return error instanceof ApiError && error.status === 401;
+}
+
 function authHeaders() {
   return authToken ? ({ Authorization: `Bearer ${authToken}` } as Record<string, string>) : {};
 }
@@ -54,7 +68,7 @@ async function request<T>(path: string, init?: RequestInit) {
 
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(errorBody?.message ?? `Request failed with status ${response.status}`);
+    throw new ApiError(errorBody?.message ?? `Request failed with status ${response.status}`, response.status);
   }
 
   if (response.status === 204) {
@@ -116,10 +130,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload)
     }),
-  suggestions: (sourceLanguage: "en" | "he", targetLanguage: "en" | "he", seed: string) =>
-    request<SuggestionsResponse>(
-      `/api/suggestions?sourceLanguage=${sourceLanguage}&targetLanguage=${targetLanguage}&seed=${encodeURIComponent(seed)}`
-    ),
+  suggestions: (sourceLanguage: "en" | "he", targetLanguage: "en" | "he", seed: string, exclude: string[] = []) => {
+    const searchParams = new URLSearchParams({
+      sourceLanguage,
+      targetLanguage,
+      seed
+    });
+
+    for (const item of exclude) {
+      searchParams.append("exclude", item);
+    }
+
+    return request<SuggestionsResponse>(`/api/suggestions?${searchParams.toString()}`);
+  },
   nextFlashcard: () => request<StudyCard | null>("/api/flashcards/next"),
   reviewFlashcard: (cardId: number, payload: ReviewRequest) =>
     request<ReviewResponse>(`/api/flashcards/${cardId}/review`, {

@@ -147,7 +147,12 @@ apiRouter.get("/suggestions", async (req, res, next) => {
     const sourceLanguage = z.enum(["en", "he"]).parse(req.query.sourceLanguage);
     const targetLanguage = z.enum(["en", "he"]).parse(req.query.targetLanguage);
     const seed = z.string().optional().parse(req.query.seed);
-    res.json(await suggestFlashcards(user.id, sourceLanguage, targetLanguage, seed));
+    const rawExclude = req.query.exclude;
+    const exclude = z
+      .array(z.string().trim().min(1).max(80))
+      .max(40)
+      .parse(Array.isArray(rawExclude) ? rawExclude : rawExclude ? [rawExclude] : []);
+    res.json(await suggestFlashcards(user.id, sourceLanguage, targetLanguage, seed, exclude));
   } catch (error) {
     next(error);
   }

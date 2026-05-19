@@ -1,6 +1,17 @@
 const serverUrl = import.meta.env.VITE_SERVER_URL ?? "";
 const SESSION_STORAGE_KEY = "oolpan_session_token";
 let authToken = typeof window !== "undefined" ? window.localStorage.getItem(SESSION_STORAGE_KEY) : null;
+export class ApiError extends Error {
+    status;
+    constructor(message, status) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+    }
+}
+export function isUnauthorizedError(error) {
+    return error instanceof ApiError && error.status === 401;
+}
 function authHeaders() {
     return authToken ? { Authorization: `Bearer ${authToken}` } : {};
 }
@@ -28,7 +39,7 @@ async function request(path, init) {
     });
     if (!response.ok) {
         const errorBody = (await response.json().catch(() => null));
-        throw new Error(errorBody?.message ?? `Request failed with status ${response.status}`);
+        throw new ApiError(errorBody?.message ?? `Request failed with status ${response.status}`, response.status);
     }
     if (response.status === 204) {
         return undefined;
@@ -78,7 +89,17 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload)
     }),
-    suggestions: (sourceLanguage, targetLanguage, seed) => request(`/api/suggestions?sourceLanguage=${sourceLanguage}&targetLanguage=${targetLanguage}&seed=${encodeURIComponent(seed)}`),
+    suggestions: (sourceLanguage, targetLanguage, seed, exclude = []) => {
+        const searchParams = new URLSearchParams({
+            sourceLanguage,
+            targetLanguage,
+            seed
+        });
+        for (const item of exclude) {
+            searchParams.append("exclude", item);
+        }
+        return request(`/api/suggestions?${searchParams.toString()}`);
+    },
     nextFlashcard: () => request("/api/flashcards/next"),
     reviewFlashcard: (cardId, payload) => request(`/api/flashcards/${cardId}/review`, {
         method: "POST",

@@ -6,6 +6,15 @@ import { apiRouter } from "./routes/api.js";
 
 let appPromise: Promise<Express> | null = null;
 
+function isLocalDevOrigin(origin: string) {
+  try {
+    const url = new URL(origin);
+    return url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 async function buildApp() {
   await initializeSchema();
   const app = express();
@@ -25,7 +34,14 @@ async function buildApp() {
             origin === "https://www.oolpan.com" ||
             origin.endsWith(".oolpan.com"));
 
-        if (!origin || isNgrokOrigin || isVercelOrigin || isOolpanOrigin || appConfig.allowedClientOrigins.includes(origin)) {
+        if (
+          !origin ||
+          isLocalDevOrigin(origin) ||
+          isNgrokOrigin ||
+          isVercelOrigin ||
+          isOolpanOrigin ||
+          appConfig.allowedClientOrigins.includes(origin)
+        ) {
           callback(null, true);
           return;
         }

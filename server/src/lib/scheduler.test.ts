@@ -7,8 +7,14 @@ function makeCard(overrides: Partial<FlashcardRecord> = {}): FlashcardRecord {
     id: 1,
     sourceText: "book",
     sourceLanguage: "en",
+    sourceTransliteration: null,
+    sourcePluralText: null,
+    sourcePluralTransliteration: null,
     targetText: "ספר",
     targetLanguage: "he",
+    targetTransliteration: null,
+    targetPluralText: null,
+    targetPluralTransliteration: null,
     partOfSpeech: "noun",
     nounGender: "masculine",
     imagePrompt: "book on a table",
@@ -21,6 +27,7 @@ function makeCard(overrides: Partial<FlashcardRecord> = {}): FlashcardRecord {
     updatedAt: new Date("2026-04-01T00:00:00.000Z").toISOString(),
     lastReviewedAt: null,
     lastResult: null,
+    masteredAt: null,
     isActive: true,
     ...overrides
   };

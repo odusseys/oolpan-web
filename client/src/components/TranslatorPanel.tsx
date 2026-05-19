@@ -1,4 +1,5 @@
 import type { AppLanguage, TranslationResult } from "@study/shared";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { t } from "../lib/copy";
 
 type TranslatorPanelProps = {
@@ -11,11 +12,21 @@ type TranslatorPanelProps = {
   isSaving: boolean;
   isSpeakingTranslation: boolean;
   onTextChange: (value: string) => void;
-  onTranslate: () => void;
   onSwap: () => void;
   onSave: () => void;
   onSpeakTranslation: () => void;
 };
+
+const TRANSLATION_TEXTAREA_MIN_HEIGHT = 120;
+
+function resizeTranslationTextarea(textarea: HTMLTextAreaElement | null) {
+  if (!textarea) {
+    return;
+  }
+
+  textarea.style.height = `${TRANSLATION_TEXTAREA_MIN_HEIGHT}px`;
+  textarea.style.height = `${Math.max(TRANSLATION_TEXTAREA_MIN_HEIGHT, textarea.scrollHeight)}px`;
+}
 
 export function TranslatorPanel({
   uiLanguage,
@@ -27,13 +38,33 @@ export function TranslatorPanel({
   isSaving,
   isSpeakingTranslation,
   onTextChange,
-  onTranslate,
   onSwap,
   onSave,
   onSpeakTranslation
 }: TranslatorPanelProps) {
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const outputRef = useRef<HTMLTextAreaElement | null>(null);
   const isHebrewInput = sourceLanguage === "he";
   const isHebrewOutput = targetLanguage === "he";
+  const sourceText = text.trim();
+  const targetText = result?.targetText.trim() ?? "";
+  const outputText = isTranslating ? "" : (result?.targetText ?? "");
+  const canSpeakInput = isHebrewInput && sourceText.length > 0;
+  const canSpeakOutput = isHebrewOutput && !isHebrewInput && targetText.length > 0;
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 980px)").matches) {
+      inputRef.current?.focus();
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    resizeTranslationTextarea(inputRef.current);
+  }, [sourceLanguage, text]);
+
+  useLayoutEffect(() => {
+    resizeTranslationTextarea(outputRef.current);
+  }, [isTranslating, outputText, targetLanguage]);
 
   return (
     <section className="panel translator-panel">
@@ -41,28 +72,13 @@ export function TranslatorPanel({
 
       <div className="translate-stack">
         <div className="translation-surface translation-input-surface">
-          <div className="surface-header">
+          <div className={isHebrewInput ? "surface-header surface-header-rtl" : "surface-header"}>
             <div className="surface-language">{sourceLanguage === "en" ? "English" : "עברית"}</div>
-            {isHebrewInput ? (
-              <button
-                className="icon-speak-button"
-                type="button"
-                aria-label={t(uiLanguage, "playAudio")}
-                title={t(uiLanguage, "playAudio")}
-                disabled={!text.trim() || isSpeakingTranslation}
-                onClick={onSpeakTranslation}
-              >
-                {isSpeakingTranslation ? (
-                  <span className="button-spinner" aria-hidden="true" />
-                ) : (
-                  <span aria-hidden="true">🔊</span>
-                )}
-              </button>
-            ) : null}
           </div>
           <label className="field">
             <span className="sr-only">{t(uiLanguage, "phraseLabel")}</span>
             <textarea
+              ref={inputRef}
               value={text}
               onChange={(event) => onTextChange(event.target.value)}
               placeholder={t(uiLanguage, isHebrewInput ? "phrasePlaceholderHe" : "phrasePlaceholderEn")}
@@ -71,12 +87,24 @@ export function TranslatorPanel({
               maxLength={1000}
             />
           </label>
-          <button className="primary-button inline-translate-button" type="button" onClick={onTranslate} disabled={!text.trim() || isTranslating}>
-            <span className="button-content">
-              {isTranslating ? <span className="button-spinner" aria-hidden="true" /> : null}
-              <span>{isTranslating ? t(uiLanguage, "translating") : t(uiLanguage, "translateAction")}</span>
-            </span>
-          </button>
+          {canSpeakInput ? (
+            <div className="surface-action-row">
+              <button
+                className="icon-speak-button"
+                type="button"
+                aria-label={t(uiLanguage, "playAudio")}
+                title={t(uiLanguage, "playAudio")}
+                disabled={isSpeakingTranslation}
+                onClick={onSpeakTranslation}
+              >
+                {isSpeakingTranslation ? (
+                  <span className="button-spinner" aria-hidden="true" />
+                ) : (
+                  <span aria-hidden="true">🔊</span>
+                )}
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="swap-row">
@@ -86,15 +114,30 @@ export function TranslatorPanel({
         </div>
 
         <div className="translation-surface translation-output">
-          <div className="surface-header">
+          <div className={isHebrewOutput ? "surface-header surface-header-rtl" : "surface-header"}>
             <div className="surface-language">{targetLanguage === "en" ? "English" : "עברית"}</div>
-            {isHebrewOutput && !isHebrewInput ? (
+          </div>
+          <textarea
+            ref={outputRef}
+            value={outputText}
+            placeholder={isTranslating ? undefined : t(uiLanguage, "translationPlaceholder")}
+            dir={isHebrewOutput ? "rtl" : "ltr"}
+            rows={5}
+            readOnly
+          />
+          {isTranslating ? (
+            <div className="translation-output-loader" aria-live="polite" aria-label={t(uiLanguage, "translating")}>
+              <span className="button-spinner" aria-hidden="true" />
+            </div>
+          ) : null}
+          {canSpeakOutput ? (
+            <div className="surface-action-row surface-action-row-output">
               <button
                 className="icon-speak-button"
                 type="button"
                 aria-label={t(uiLanguage, "playAudio")}
                 title={t(uiLanguage, "playAudio")}
-                disabled={!result?.targetText.trim() || isSpeakingTranslation}
+                disabled={isSpeakingTranslation}
                 onClick={onSpeakTranslation}
               >
                 {isSpeakingTranslation ? (
@@ -103,15 +146,8 @@ export function TranslatorPanel({
                   <span aria-hidden="true">🔊</span>
                 )}
               </button>
-            ) : null}
-          </div>
-          <textarea
-            value={result?.targetText ?? ""}
-            placeholder={t(uiLanguage, "translationPlaceholder")}
-            dir={isHebrewOutput ? "rtl" : "ltr"}
-            rows={5}
-            readOnly
-          />
+            </div>
+          ) : null}
         </div>
       </div>
 

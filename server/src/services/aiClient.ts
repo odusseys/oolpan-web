@@ -22,7 +22,7 @@ type GeneratedSpeech = SpeechResponse;
 const IMAGE_STYLE_DESCRIPTOR =
   "cel shaded Pixar aesthetic, soft cinematic volumetric lighting, vibrant colors, whimsical, cel shading, hybrid 2D/3D aesthetic, simple";
 const IMAGE_SCENE_REQUIREMENTS =
-  "Describe a detailed scene with a clear subject, visible environment, layered background elements, and non-solid surroundings. Never include written text, letters, captions, labels, signage, or typography anywhere in the image.";
+  "For ordinary vocabulary, show the most literal, direct, and easily recognizable real-world subject or action. Avoid abstract metaphors, symbolic substitutions, visual puns, surreal scenes, or far-fetched associations unless required for adult-safety. Describe a detailed scene with a clear subject, visible environment, layered background elements, and non-solid surroundings. Never include written text, letters, captions, labels, signage, or typography anywhere in the image.";
 const ADULT_CONTENT_REQUIREMENTS =
   "If the vocabulary could be adult, sexual, intimate, or explicit in nature, use a metaphorical educational visual only. Do not include nudity, sexual acts, fetish elements, explicit body focus, intimate touching, underwear scenes, or other adult imagery. Prefer symbolic objects, mood, weather, color, distance, or other indirect metaphors.";
 
@@ -74,6 +74,12 @@ const translationResultSchema = z.object({
   translation: z.string().min(1)
 });
 
+const googleTranslateResponseSchema = z.object({
+  data: z.object({
+    translations: z.array(z.object({ translatedText: z.string().min(1) })).min(1)
+  })
+});
+
 const imagePromptResultSchema = z.object({
   imagePrompt: z.string().min(1)
 });
@@ -97,10 +103,78 @@ const translatedSuggestionsSchema = z.object({
   translations: z.array(z.object({ englishText: z.string().min(1), translatedText: z.string().min(1) })).length(10)
 });
 
+const transliterationResultSchema = z.object({
+  transliteration: z.string().min(1)
+});
+
+const nikudResultSchema = z.object({
+  textWithNikud: z.string().min(1)
+});
+
+const pluralizationResultSchema = z.object({
+  canPluralize: z.boolean(),
+  sourcePluralText: z.string().min(1).nullable(),
+  targetPluralText: z.string().min(1).nullable()
+});
+
 type FlashcardMeaning = Pick<CreateFlashcardRequest, "sourceText" | "sourceLanguage" | "targetText" | "targetLanguage">;
+type FlashcardPluralization = Pick<CreateFlashcardRequest, "sourcePluralText" | "targetPluralText">;
+
+function miniModel(model: string) {
+  if (model.includes("-mini")) {
+    return model;
+  }
+
+  if (model.startsWith("gpt-")) {
+    return `${model}-mini`;
+  }
+
+  return model;
+}
 
 function languageName(language: AppLanguage) {
   return language === "en" ? "English" : "Hebrew";
+}
+
+function googleLanguageCode(language: AppLanguage) {
+  return language;
+}
+
+function stripHebrewNikud(text: string) {
+  return text.normalize("NFC").replace(/[\u0591-\u05C7]/g, "");
+}
+
+function decodeHtmlEntities(text: string) {
+  const namedEntities: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    lt: "<",
+    quot: '"'
+  };
+
+  return text.replace(/&(#x[\da-f]+|#\d+|amp|apos|gt|lt|quot);/gi, (entity, value: string) => {
+    const normalized = value.toLowerCase();
+
+    if (normalized.startsWith("#x")) {
+      return String.fromCodePoint(Number.parseInt(normalized.slice(2), 16));
+    }
+
+    if (normalized.startsWith("#")) {
+      return String.fromCodePoint(Number.parseInt(normalized.slice(1), 10));
+    }
+
+    return namedEntities[normalized] ?? entity;
+  });
+}
+
+function normalizeSuggestionText(text: string) {
+  return text
+    .normalize("NFKD")
+    .replace(/\p{Mark}/gu, "")
+    .replace(/[^\p{Letter}\p{Number}]+/gu, " ")
+    .trim()
+    .toLocaleLowerCase();
 }
 
 function endpointUrl(baseUrl: string, path: string) {
@@ -256,7 +330,7 @@ class MockAiClient {
     const adultSafety = isPotentiallyAdultMeaning(input)
       ? ", rendered as a metaphorical non-explicit study image with symbolic objects and no adult elements"
       : "";
-    return `A friendly detailed study-card scene that visualizes ${focusText}${adultSafety}, with a clear environment and a rich non-solid background, with no text in the image`;
+    return `A friendly detailed study-card scene that directly and literally shows ${focusText}${adultSafety}, with a clear environment and a rich non-solid background, with no text in the image`;
   }
 
   async generateIllustration(prompt: string) {
@@ -300,24 +374,64 @@ class MockAiClient {
     };
   }
 
+  async transliterateHebrew(text: string): Promise<string> {
+    return `mock transliteration: ${text.trim()}`;
+  }
+
+  async addNikudToHebrew(text: string): Promise<string> {
+    return text.trim();
+  }
+
+  async pluralizeFlashcard(input: FlashcardMeaning): Promise<FlashcardPluralization | null> {
+    const source = input.sourceText.trim();
+    const target = input.targetText.trim();
+
+    if (!source || !target) {
+      return null;
+    }
+
+    return {
+      sourcePluralText: input.sourceLanguage === "en" ? `${source}s` : `${source}ים`,
+      targetPluralText: input.targetLanguage === "en" ? `${target}s` : `${target}ים`
+    };
+  }
+
   async suggestRelatedFlashcards(
     recentCards: FlashcardRecord[],
     sourceLanguage: AppLanguage,
     targetLanguage: AppLanguage,
-    variationHint?: string
+    variationHint?: string,
+    excludedEnglishItems: string[] = []
   ): Promise<SuggestedFlashcard[]> {
     const seed = recentCards[0]?.sourceText ?? "book";
     const suffix = variationHint ? variationHint.slice(-4) : "seed";
-    return Array.from({ length: 10 }, (_, index) => ({
-      id: `mock-${suffix}-${index + 1}`,
-      sourceText: `${seed} ${index + 1}`,
-      sourceLanguage,
-      targetText: sourceLanguage === "en" ? `תרגום ${index + 1}` : `translation ${index + 1}`,
-      targetLanguage,
-      partOfSpeech: "phrase",
-      nounGender: null,
-      isMock: true
-    }));
+    const excluded = new Set(excludedEnglishItems.map(normalizeSuggestionText));
+    const suggestions: SuggestedFlashcard[] = [];
+    let index = 0;
+
+    while (suggestions.length < 10) {
+      index += 1;
+      const sourceText = `${seed} ${suffix} ${index}`;
+      const targetText = sourceLanguage === "en" ? `תרגום ${suffix} ${index}` : `translation ${suffix} ${index}`;
+      const englishText = sourceLanguage === "en" ? sourceText : targetText;
+
+      if (excluded.has(normalizeSuggestionText(englishText))) {
+        continue;
+      }
+
+      suggestions.push({
+        id: `mock-${suffix}-${index}`,
+        sourceText,
+        sourceLanguage,
+        targetText,
+        targetLanguage,
+        partOfSpeech: "phrase",
+        nounGender: null,
+        isMock: true
+      });
+    }
+
+    return suggestions;
   }
 }
 
@@ -325,6 +439,10 @@ class OpenAiCompatibleAiClient {
   readonly mode = "openai-compatible" as const;
 
   async translate(request: TranslationRequest): Promise<TranslationResult> {
+    if (appConfig.googleTranslateApiKey) {
+      return this.translateWithGoogle(request);
+    }
+
     if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
       throw new Error("Missing LLM configuration");
     }
@@ -332,7 +450,8 @@ class OpenAiCompatibleAiClient {
     const systemPrompt = [
       "You are a translation and vocabulary helper.",
       "Return JSON only with the key translation.",
-      "Translate the source text faithfully into the target language.",
+      "Translate the source text into the target language using the natural phrasing someone would use in everyday conversation.",
+      "Prefer the common spoken wording over a formal, literal, or dictionary-style translation when those differ.",
       "If the target language is Hebrew, first determine the correct Hebrew translation without nikud.",
       "Then add nikud to that exact translation.",
       "Do not remove, replace, or reorder any Hebrew letters when adding nikud; only add nikud marks on top of the same letters."
@@ -351,9 +470,9 @@ class OpenAiCompatibleAiClient {
         Authorization: `Bearer ${appConfig.llmApiKey}`
       },
       body: JSON.stringify({
-        model: appConfig.llmModel,
+        model: miniModel(appConfig.llmModel),
         reasoning: {
-          effort: "low"
+          effort: "none"
         },
         instructions: systemPrompt,
         input: userPrompt
@@ -380,6 +499,73 @@ class OpenAiCompatibleAiClient {
     };
   }
 
+  private async translateWithGoogle(request: TranslationRequest): Promise<TranslationResult> {
+    const translations = await this.translateTextsWithGoogle([request.text.trim()], request.sourceLanguage, request.targetLanguage);
+    const translation = translations[0];
+
+    if (!translation) {
+      throw new Error("Google Translate response did not include a translation");
+    }
+
+    return {
+      sourceText: request.text.trim(),
+      sourceLanguage: request.sourceLanguage,
+      targetText: translation,
+      targetLanguage: request.targetLanguage,
+      partOfSpeech: "phrase",
+      nounGender: null,
+      isMock: false
+    };
+  }
+
+  private async translateTextsWithGoogle(texts: string[], sourceLanguage: AppLanguage, targetLanguage: AppLanguage) {
+    if (!appConfig.googleTranslateApiKey) {
+      throw new Error("Missing Google Translate configuration");
+    }
+
+    const trimmedTexts = texts.map((text) => text.trim()).filter(Boolean);
+    if (trimmedTexts.length === 0) {
+      return [];
+    }
+
+    const url = new URL(appConfig.googleTranslateBaseUrl);
+    url.searchParams.set("key", appConfig.googleTranslateApiKey);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        q: trimmedTexts,
+        source: googleLanguageCode(sourceLanguage),
+        target: googleLanguageCode(targetLanguage),
+        format: "text"
+      })
+    });
+
+    if (!response.ok) {
+      await throwApiError("Google Translate request", response);
+    }
+
+    const payload = googleTranslateResponseSchema.parse((await response.json()) as unknown);
+    const translations = payload.data.translations.map((item) => decodeHtmlEntities(item.translatedText.trim()));
+
+    if (translations.length !== trimmedTexts.length) {
+      throw new Error("Google Translate response length did not match request length");
+    }
+
+    return translations;
+  }
+
+  private async translateEnglishSuggestionsWithGoogle(englishItems: string[]) {
+    const translations = await this.translateTextsWithGoogle(englishItems, "en", "he");
+    return englishItems.map((englishText, index) => ({
+      englishText,
+      translatedText: translations[index] ?? englishText
+    }));
+  }
+
   async describeFlashcardScene(input: FlashcardMeaning): Promise<string> {
     if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
       throw new Error("Missing LLM configuration");
@@ -388,7 +574,9 @@ class OpenAiCompatibleAiClient {
     const systemPrompt = [
       "You write image prompts for educational flashcards.",
       "Return JSON only with the key imagePrompt.",
-      "Describe a single vivid scene that conveys the meaning of the word or phrase.",
+      "Describe a single vivid scene that shows the meaning of the word or phrase directly and literally.",
+      "For ordinary vocabulary, use the obvious real-world object, person, place, or action.",
+      "Avoid abstract metaphors, symbolic substitutions, visual puns, surreal imagery, or far-fetched associations unless adult-safety requires an indirect image.",
       "Include foreground subject details plus environment and background details.",
       "Do not include any written text, letters, signage, captions, or labels in the image.",
       "Never use a plain or solid-color background.",
@@ -521,11 +709,161 @@ class OpenAiCompatibleAiClient {
     };
   }
 
+  async transliterateHebrew(text: string): Promise<string> {
+    if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
+      throw new Error("Missing LLM configuration");
+    }
+
+    const trimmedText = text.trim();
+    const systemPrompt = [
+      "You transliterate Hebrew for English-speaking language learners.",
+      "Return JSON only with the key transliteration.",
+      "Write the Hebrew text in simple Latin letters using common modern Israeli Hebrew pronunciation.",
+      "Preserve word order.",
+      "Do not use IPA symbols.",
+      "Do not explain anything."
+    ].join(" ");
+
+    const response = await fetch(endpointUrl(appConfig.llmApiBaseUrl, "responses"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${appConfig.llmApiKey}`
+      },
+      body: JSON.stringify({
+        model: miniModel(appConfig.llmModel),
+        reasoning: {
+          effort: "none"
+        },
+        instructions: systemPrompt,
+        input: trimmedText
+      })
+    });
+
+    if (!response.ok) {
+      await throwApiError("Transliteration request", response);
+    }
+
+    const payload = (await response.json()) as unknown;
+    const content = extractResponseOutputText(payload);
+    const parsed = transliterationResultSchema.parse(extractJsonObject(content));
+    return parsed.transliteration.trim();
+  }
+
+  async addNikudToHebrew(text: string): Promise<string> {
+    if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
+      throw new Error("Missing LLM configuration");
+    }
+
+    const trimmedText = text.trim();
+    const systemPrompt = [
+      "You add nikud to Hebrew text for language learners.",
+      "Return JSON only with the key textWithNikud.",
+      "Add the correct Hebrew nikud marks to the provided text.",
+      "Do not remove any existing Hebrew letters.",
+      "Do not replace any existing Hebrew letters.",
+      "Do not reorder any existing Hebrew letters.",
+      "Do not add new Hebrew letters.",
+      "Only add nikud marks to the exact existing Hebrew letters.",
+      "Keep spaces, punctuation, and non-Hebrew text unchanged.",
+      "Do not explain anything."
+    ].join(" ");
+
+    const response = await fetch(endpointUrl(appConfig.llmApiBaseUrl, "responses"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${appConfig.llmApiKey}`
+      },
+      body: JSON.stringify({
+        model: miniModel(appConfig.llmModel),
+        reasoning: {
+          effort: "none"
+        },
+        instructions: systemPrompt,
+        input: trimmedText
+      })
+    });
+
+    if (!response.ok) {
+      await throwApiError("Nikud request", response);
+    }
+
+    const payload = (await response.json()) as unknown;
+    const content = extractResponseOutputText(payload);
+    const parsed = nikudResultSchema.parse(extractJsonObject(content));
+    const textWithNikud = parsed.textWithNikud.trim();
+
+    if (stripHebrewNikud(textWithNikud) !== stripHebrewNikud(trimmedText)) {
+      throw new Error("Nikud response changed the original Hebrew letters");
+    }
+
+    return textWithNikud;
+  }
+
+  async pluralizeFlashcard(input: FlashcardMeaning): Promise<FlashcardPluralization | null> {
+    if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
+      throw new Error("Missing LLM configuration");
+    }
+
+    const systemPrompt = [
+      "You identify whether a bilingual flashcard can be naturally reviewed in plural form.",
+      "Return JSON only with the keys canPluralize, sourcePluralText, and targetPluralText.",
+      "If the flashcard is a count noun or noun phrase with a normal plural form in both languages, set canPluralize true.",
+      "When canPluralize is true, return the natural plural version of the full source text and the full target text.",
+      "If either side cannot be naturally pluralized, set canPluralize false and both plural fields to null.",
+      "Use everyday conversational wording.",
+      "If a Hebrew plural is returned, include nikud.",
+      "Do not explain anything."
+    ].join(" ");
+
+    const userPrompt = [
+      `Source language: ${languageName(input.sourceLanguage)}.`,
+      `Target language: ${languageName(input.targetLanguage)}.`,
+      `Source text: ${input.sourceText.trim()}.`,
+      `Target text: ${input.targetText.trim()}.`
+    ].join("\n");
+
+    const response = await fetch(endpointUrl(appConfig.llmApiBaseUrl, "responses"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${appConfig.llmApiKey}`
+      },
+      body: JSON.stringify({
+        model: miniModel(appConfig.llmModel),
+        reasoning: {
+          effort: "none"
+        },
+        instructions: systemPrompt,
+        input: userPrompt
+      })
+    });
+
+    if (!response.ok) {
+      await throwApiError("Pluralization request", response);
+    }
+
+    const payload = (await response.json()) as unknown;
+    const content = extractResponseOutputText(payload);
+    const parsed = pluralizationResultSchema.parse(extractJsonObject(content));
+
+    if (!parsed.canPluralize || !parsed.sourcePluralText?.trim() || !parsed.targetPluralText?.trim()) {
+      return null;
+    }
+
+    return {
+      sourcePluralText: parsed.sourcePluralText.trim(),
+      targetPluralText: parsed.targetPluralText.trim()
+    };
+  }
+
   async suggestRelatedFlashcards(
     recentCards: FlashcardRecord[],
     sourceLanguage: AppLanguage,
     targetLanguage: AppLanguage,
-    variationHint?: string
+    variationHint?: string,
+    excludedEnglishItems: string[] = []
   ): Promise<SuggestedFlashcard[]> {
     if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
       throw new Error("Missing LLM configuration");
@@ -542,9 +880,12 @@ class OpenAiCompatibleAiClient {
       "Each object must contain englishText.",
       "Generate all suggestions in English only.",
       "The suggestions should be conceptually or lexically related to the seed items.",
+      "Maximize diversity: cover different semantic subtopics, situations, parts of speech, and levels of specificity.",
+      "Avoid near-synonyms, same-root variants, plural-only variants, and repeated everyday objects from the same narrow category.",
+      "Do not include any item from the avoid list, and do not include close paraphrases of avoid-list items.",
       "Include a balanced mix of nouns, verbs, adjectives, and exactly 2 multi-word phrases.",
       "Keep each englishText concise and useful for study.",
-      "Use the variation token only to diversify the returned ideas while keeping them relevant."
+      "Use the variation token as a branch selector for a fresh set of ideas while keeping them relevant."
     ].join(" ");
 
     const userPrompt = [
@@ -552,7 +893,10 @@ class OpenAiCompatibleAiClient {
       `Target language: ${languageName(targetLanguage)}.`,
       variationHint ? `Variation token: ${variationHint}.` : "",
       "Use these recent flashcards as the semantic neighborhood:",
-      context
+      context,
+      excludedEnglishItems.length > 0
+        ? ["Avoid these already visible or previously suggested English items:", ...excludedEnglishItems.map((item, index) => `${index + 1}. ${item}`)].join("\n")
+        : ""
     ]
       .filter(Boolean)
       .join("\n");
@@ -566,7 +910,7 @@ class OpenAiCompatibleAiClient {
       body: JSON.stringify({
         model: appConfig.llmModel,
         reasoning: {
-          effort: "medium"
+          effort: "none"
         },
         instructions: systemPrompt,
         input: userPrompt
@@ -580,7 +924,19 @@ class OpenAiCompatibleAiClient {
     const payload = (await response.json()) as unknown;
     const content = extractResponseOutputText(payload);
     const parsedEnglish = englishSuggestionSeedSchema.parse(extractJsonObject(content));
-    const englishItems = parsedEnglish.suggestions.map((suggestion) => suggestion.englishText.trim());
+    const excludedSet = new Set(excludedEnglishItems.map(normalizeSuggestionText));
+    const acceptedEnglishKeys = new Set<string>();
+    const englishItems = parsedEnglish.suggestions
+      .map((suggestion) => suggestion.englishText.trim())
+      .filter((item) => {
+        const key = normalizeSuggestionText(item);
+        if (!key || excludedSet.has(key) || acceptedEnglishKeys.has(key)) {
+          return false;
+        }
+
+        acceptedEnglishKeys.add(key);
+        return true;
+      });
     const needsHebrew = sourceLanguage === "he" || targetLanguage === "he";
 
     let translatedPairs: Array<{ englishText: string; translatedText: string }> = englishItems.map((englishText) => ({
@@ -589,48 +945,52 @@ class OpenAiCompatibleAiClient {
     }));
 
     if (needsHebrew) {
-      const translationSystemPrompt = [
-        "You translate English study items into Hebrew.",
-        "Return JSON only with the key translations.",
-        "translations must be an array with the same order and length as the input items.",
-        "Each object must contain englishText and translatedText.",
-        "First determine the correct Hebrew translation without nikud.",
-        "Then add nikud to that exact Hebrew translation.",
-        "Do not remove, replace, or reorder any Hebrew letters when adding nikud; only add nikud marks on top of the same letters."
-      ].join(" ");
+      if (appConfig.googleTranslateApiKey) {
+        translatedPairs = await this.translateEnglishSuggestionsWithGoogle(englishItems);
+      } else {
+        const translationSystemPrompt = [
+          "You translate English study items into Hebrew.",
+          "Return JSON only with the key translations.",
+          "translations must be an array with the same order and length as the input items.",
+          "Each object must contain englishText and translatedText.",
+          "First determine the correct Hebrew translation without nikud.",
+          "Then add nikud to that exact Hebrew translation.",
+          "Do not remove, replace, or reorder any Hebrew letters when adding nikud; only add nikud marks on top of the same letters."
+        ].join(" ");
 
-      const translationUserPrompt = [
-        "Translate these English study items into Hebrew with nikud.",
-        ...englishItems.map((item, index) => `${index + 1}. ${item}`)
-      ].join("\n");
+        const translationUserPrompt = [
+          "Translate these English study items into Hebrew with nikud.",
+          ...englishItems.map((item, index) => `${index + 1}. ${item}`)
+        ].join("\n");
 
-      const translationResponse = await fetch(endpointUrl(appConfig.llmApiBaseUrl, "responses"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${appConfig.llmApiKey}`
-        },
-        body: JSON.stringify({
-          model: appConfig.llmModel,
-          reasoning: {
-            effort: "medium"
+        const translationResponse = await fetch(endpointUrl(appConfig.llmApiBaseUrl, "responses"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${appConfig.llmApiKey}`
           },
-          instructions: translationSystemPrompt,
-          input: translationUserPrompt
-        })
-      });
+          body: JSON.stringify({
+            model: appConfig.llmModel,
+            reasoning: {
+              effort: "none"
+            },
+            instructions: translationSystemPrompt,
+            input: translationUserPrompt
+          })
+        });
 
-      if (!translationResponse.ok) {
-        await throwApiError("Suggestion translation request", translationResponse);
+        if (!translationResponse.ok) {
+          await throwApiError("Suggestion translation request", translationResponse);
+        }
+
+        const translationPayload = (await translationResponse.json()) as unknown;
+        const translationContent = extractResponseOutputText(translationPayload);
+        const parsedTranslations = translatedSuggestionsSchema.parse(extractJsonObject(translationContent));
+        translatedPairs = parsedTranslations.translations.map((item) => ({
+          englishText: item.englishText.trim(),
+          translatedText: item.translatedText.trim()
+        }));
       }
-
-      const translationPayload = (await translationResponse.json()) as unknown;
-      const translationContent = extractResponseOutputText(translationPayload);
-      const parsedTranslations = translatedSuggestionsSchema.parse(extractJsonObject(translationContent));
-      translatedPairs = parsedTranslations.translations.map((item) => ({
-        englishText: item.englishText.trim(),
-        translatedText: item.translatedText.trim()
-      }));
     }
 
     return translatedPairs.map((item, index) => ({
@@ -704,12 +1064,13 @@ async function generateWithFal(prompt: string): Promise<GeneratedImage> {
 }
 
 export function createAiClient() {
-  const hasLiveConfig =
+  const hasOpenAiCompatibleConfig =
     Boolean(appConfig.llmApiBaseUrl) &&
     Boolean(appConfig.llmApiKey) &&
     Boolean(appConfig.llmModel) &&
     (Boolean(appConfig.falKey) ||
       (Boolean(appConfig.imageApiBaseUrl) && Boolean(appConfig.imageApiKey) && Boolean(appConfig.imageModel)));
+  const hasLiveConfig = Boolean(appConfig.googleTranslateApiKey) || hasOpenAiCompatibleConfig;
 
   return hasLiveConfig ? new OpenAiCompatibleAiClient() : new MockAiClient();
 }

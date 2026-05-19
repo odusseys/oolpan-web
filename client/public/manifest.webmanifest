@@ -1,0 +1,26 @@
+{
+  "name": "Oolpan",
+  "short_name": "Oolpan",
+  "description": "A visual Hebrew and English flashcard trainer.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8f0ff",
+  "theme_color": "#8d6ae0",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

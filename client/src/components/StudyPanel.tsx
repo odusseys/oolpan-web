@@ -44,6 +44,8 @@ export function StudyPanel({
   const answerAudioKey = card ? `flashcard:${card.id}:answer:${card.answerLanguage}:${card.answerText}` : null;
   const canSpeakPrompt = card?.promptLanguage === "he";
   const canSpeakAnswer = card?.answerLanguage === "he";
+  const promptTransliteration = card?.promptLanguage === "he" ? card.promptTransliteration : null;
+  const answerTransliteration = card?.answerLanguage === "he" ? card.answerTransliteration : null;
 
   return (
     <section className="panel review-panel">
@@ -95,58 +97,66 @@ export function StudyPanel({
 
             <div className="prompt-block">
               {isRevealed ? (
-                <div className="revealed-compare">
-                  <div className="revealed-column">
-                    <div className="spoken-line">
+                <div className="revealed-stack">
+                  <div className="revealed-result-line spoken-line">
+                    <div className="answer-block">
+                      <div className="card-text-stack">
+                        <p className="revealed-answer-text" dir={card.answerLanguage === "he" ? "rtl" : "ltr"}>
+                          {card.answerText}
+                        </p>
+                        {answerTransliteration ? <p className="transliteration-text">{answerTransliteration}</p> : null}
+                      </div>
+                    </div>
+                    {canSpeakAnswer ? (
+                      <button
+                        className="icon-speak-button"
+                        type="button"
+                        aria-label={t(uiLanguage, "playAudio")}
+                        title={t(uiLanguage, "playAudio")}
+                        disabled={isBusy || !answerAudioKey || loadingAudioKey !== null}
+                        onClick={() => answerAudioKey && onSpeak(answerAudioKey, card.answerText, card.answerLanguage)}
+                      >
+                        {loadingAudioKey === answerAudioKey ? (
+                          <span className="button-spinner" aria-hidden="true" />
+                        ) : (
+                          <span aria-hidden="true">🔊</span>
+                        )}
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="revealed-source-line spoken-line">
+                    <div className="card-text-stack">
                       <p className="prompt-text prompt-text-revealed" dir={card.promptLanguage === "he" ? "rtl" : "ltr"}>
                         {card.promptText}
                       </p>
-                      {canSpeakPrompt ? (
-                        <button
-                          className="icon-speak-button"
-                          type="button"
-                          aria-label={t(uiLanguage, "playAudio")}
-                          title={t(uiLanguage, "playAudio")}
-                          disabled={isBusy || !promptAudioKey || loadingAudioKey !== null}
-                          onClick={() => promptAudioKey && onSpeak(promptAudioKey, card.promptText, card.promptLanguage)}
-                        >
-                          {loadingAudioKey === promptAudioKey ? (
-                            <span className="button-spinner" aria-hidden="true" />
-                          ) : (
-                            <span aria-hidden="true">🔊</span>
-                          )}
-                        </button>
-                      ) : null}
+                      {promptTransliteration ? <p className="transliteration-text">{promptTransliteration}</p> : null}
                     </div>
-                  </div>
-                  <div className="revealed-divider" aria-hidden="true" />
-                  <div className="revealed-column">
-                    <div className="answer-block spoken-line">
-                      <p dir={card.answerLanguage === "he" ? "rtl" : "ltr"}>{card.answerText}</p>
-                      {canSpeakAnswer ? (
-                        <button
-                          className="icon-speak-button"
-                          type="button"
-                          aria-label={t(uiLanguage, "playAudio")}
-                          title={t(uiLanguage, "playAudio")}
-                          disabled={isBusy || !answerAudioKey || loadingAudioKey !== null}
-                          onClick={() => answerAudioKey && onSpeak(answerAudioKey, card.answerText, card.answerLanguage)}
-                        >
-                          {loadingAudioKey === answerAudioKey ? (
-                            <span className="button-spinner" aria-hidden="true" />
-                          ) : (
-                            <span aria-hidden="true">🔊</span>
-                          )}
-                        </button>
-                      ) : null}
-                    </div>
+                    {canSpeakPrompt ? (
+                      <button
+                        className="icon-speak-button"
+                        type="button"
+                        aria-label={t(uiLanguage, "playAudio")}
+                        title={t(uiLanguage, "playAudio")}
+                        disabled={isBusy || !promptAudioKey || loadingAudioKey !== null}
+                        onClick={() => promptAudioKey && onSpeak(promptAudioKey, card.promptText, card.promptLanguage)}
+                      >
+                        {loadingAudioKey === promptAudioKey ? (
+                          <span className="button-spinner" aria-hidden="true" />
+                        ) : (
+                          <span aria-hidden="true">🔊</span>
+                        )}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : (
                 <div className="spoken-line spoken-line-centered">
-                  <p className="prompt-text" dir={card.promptLanguage === "he" ? "rtl" : "ltr"}>
-                    {card.promptText}
-                  </p>
+                  <div className="card-text-stack">
+                    <p className="prompt-text" dir={card.promptLanguage === "he" ? "rtl" : "ltr"}>
+                      {card.promptText}
+                    </p>
+                    {promptTransliteration ? <p className="transliteration-text">{promptTransliteration}</p> : null}
+                  </div>
                   {canSpeakPrompt ? (
                     <button
                       className="icon-speak-button"

@@ -1,3 +1,4 @@
+import { LEARNED_SCORE_THRESHOLD } from "@study/shared";
 import { adminDb } from "./database.js";
 import { DEFAULT_ADAPTIVE_LEARNING_SCORE } from "../lib/scheduler.js";
 
@@ -48,8 +49,14 @@ async function createSchema() {
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         source_text TEXT NOT NULL,
         source_language TEXT NOT NULL,
+        source_transliteration TEXT,
+        source_plural_text TEXT,
+        source_plural_transliteration TEXT,
         target_text TEXT NOT NULL,
         target_language TEXT NOT NULL,
+        target_transliteration TEXT,
+        target_plural_text TEXT,
+        target_plural_transliteration TEXT,
         part_of_speech TEXT NOT NULL,
         noun_gender TEXT,
         image_prompt TEXT NOT NULL,
@@ -62,6 +69,7 @@ async function createSchema() {
         updated_at TIMESTAMPTZ NOT NULL,
         last_reviewed_at TIMESTAMPTZ,
         last_result TEXT,
+        mastered_at TIMESTAMPTZ,
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         UNIQUE (user_id, source_text, source_language, target_text, target_language)
       )
@@ -75,6 +83,47 @@ async function createSchema() {
     await sql`
       CREATE INDEX IF NOT EXISTS flashcards_user_last_reviewed_idx
       ON flashcards (user_id, last_reviewed_at)
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_transliteration TEXT
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_transliteration TEXT
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_plural_text TEXT
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_plural_text TEXT
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_plural_transliteration TEXT
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_plural_transliteration TEXT
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS mastered_at TIMESTAMPTZ
+    `;
+
+    await sql`
+      UPDATE flashcards
+      SET mastered_at = COALESCE(mastered_at, updated_at)
+      WHERE weight > ${LEARNED_SCORE_THRESHOLD}
     `;
   });
 }

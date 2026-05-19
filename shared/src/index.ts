@@ -4,6 +4,7 @@ export type AppLanguage = (typeof languages)[number];
 
 export const reviewResults = ["oops", "got_it"] as const;
 export type ReviewResult = (typeof reviewResults)[number];
+export const LEARNED_SCORE_THRESHOLD = 0.8;
 
 export const partOfSpeechOptions = ["noun", "verb", "adjective", "phrase", "other"] as const;
 export type PartOfSpeech = (typeof partOfSpeechOptions)[number];
@@ -38,14 +39,26 @@ export interface TranslationResult {
 
 export interface CreateFlashcardRequest extends TranslationResult {
   imagePrompt?: string;
+  sourceTransliteration?: string | null;
+  targetTransliteration?: string | null;
+  sourcePluralText?: string | null;
+  targetPluralText?: string | null;
+  sourcePluralTransliteration?: string | null;
+  targetPluralTransliteration?: string | null;
 }
 
 export interface FlashcardRecord {
   id: number;
   sourceText: string;
   sourceLanguage: AppLanguage;
+  sourceTransliteration: string | null;
+  sourcePluralText: string | null;
+  sourcePluralTransliteration: string | null;
   targetText: string;
   targetLanguage: AppLanguage;
+  targetTransliteration: string | null;
+  targetPluralText: string | null;
+  targetPluralTransliteration: string | null;
   partOfSpeech: PartOfSpeech;
   nounGender: NounGender | null;
   imagePrompt: string;
@@ -58,15 +71,19 @@ export interface FlashcardRecord {
   updatedAt: string;
   lastReviewedAt: string | null;
   lastResult: ReviewResult | null;
+  masteredAt: string | null;
   isActive: boolean;
 }
 
 export interface StudyCard extends FlashcardRecord {
   promptSide: "source" | "target";
+  numberForm: "singular" | "plural";
   promptText: string;
   promptLanguage: AppLanguage;
+  promptTransliteration: string | null;
   answerText: string;
   answerLanguage: AppLanguage;
+  answerTransliteration: string | null;
   imageUrl: string | null;
   samplingWeight: number;
 }
@@ -87,6 +104,10 @@ export interface ReviewResponse {
   updatedCard: FlashcardRecord;
   nextCard: StudyCard | null;
   stats: DeckStats;
+  masteredFlashcard: {
+    id: number;
+    text: string;
+  } | null;
 }
 
 export interface HealthResponse {

@@ -22,6 +22,12 @@ export const createFlashcardRequestSchema = z.object({
   partOfSpeech: z.enum(partOfSpeechOptions),
   nounGender: z.enum(nounGenderOptions).nullable(),
   imagePrompt: z.string().trim().min(1).optional(),
+  sourceTransliteration: z.string().trim().min(1).nullable().optional(),
+  targetTransliteration: z.string().trim().min(1).nullable().optional(),
+  sourcePluralText: z.string().trim().min(1).nullable().optional(),
+  targetPluralText: z.string().trim().min(1).nullable().optional(),
+  sourcePluralTransliteration: z.string().trim().min(1).nullable().optional(),
+  targetPluralTransliteration: z.string().trim().min(1).nullable().optional(),
   isMock: z.boolean()
 });
 

@@ -1,9 +1,10 @@
-import type {
-  CreateFlashcardRequest,
-  DeckStats,
-  FlashcardRecord,
-  ReviewResult,
-  TranslationResult
+import {
+  LEARNED_SCORE_THRESHOLD,
+  type CreateFlashcardRequest,
+  type DeckStats,
+  type FlashcardRecord,
+  type ReviewResult,
+  type TranslationResult
 } from "@study/shared";
 import type { TransactionSql } from "postgres";
 import type { DbClient } from "./database.js";
@@ -15,8 +16,14 @@ type FlashcardRow = {
   user_id: number;
   source_text: string;
   source_language: "en" | "he";
+  source_transliteration: string | null;
+  source_plural_text: string | null;
+  source_plural_transliteration: string | null;
   target_text: string;
   target_language: "en" | "he";
+  target_transliteration: string | null;
+  target_plural_text: string | null;
+  target_plural_transliteration: string | null;
   part_of_speech: FlashcardRecord["partOfSpeech"];
   noun_gender: FlashcardRecord["nounGender"];
   image_prompt: string;
@@ -29,6 +36,7 @@ type FlashcardRow = {
   updated_at: string;
   last_reviewed_at: string | null;
   last_result: ReviewResult | null;
+  mastered_at: string | null;
   is_active: boolean;
 };
 
@@ -47,8 +55,14 @@ function mapRow(row: FlashcardRow): FlashcardRecord {
     id: row.id,
     sourceText: row.source_text,
     sourceLanguage: row.source_language,
+    sourceTransliteration: row.source_transliteration,
+    sourcePluralText: row.source_plural_text,
+    sourcePluralTransliteration: row.source_plural_transliteration,
     targetText: row.target_text,
     targetLanguage: row.target_language,
+    targetTransliteration: row.target_transliteration,
+    targetPluralText: row.target_plural_text,
+    targetPluralTransliteration: row.target_plural_transliteration,
     partOfSpeech: row.part_of_speech,
     nounGender: row.noun_gender,
     imagePrompt: row.image_prompt,
@@ -61,6 +75,7 @@ function mapRow(row: FlashcardRow): FlashcardRecord {
     updatedAt: row.updated_at,
     lastReviewedAt: row.last_reviewed_at,
     lastResult: row.last_result,
+    masteredAt: row.mastered_at,
     isActive: row.is_active
   };
 }
@@ -94,7 +109,13 @@ async function findFlashcardByPhraseWithClient(
   return row ? mapRow(row) : null;
 }
 
-async function reactivateFlashcardWithClient(sql: DbQueryable, userId: number, id: number, imageData: string | null) {
+async function reactivateFlashcardWithClient(
+  sql: DbQueryable,
+  userId: number,
+  id: number,
+  input: CreateFlashcardRequest,
+  imageData: string | null
+) {
   const updatedAt = new Date().toISOString();
 
   if (imageData) {
@@ -102,6 +123,12 @@ async function reactivateFlashcardWithClient(sql: DbQueryable, userId: number, i
       UPDATE flashcards
       SET is_active = TRUE,
           image_data = COALESCE(image_data, ${imageData}),
+          source_transliteration = COALESCE(source_transliteration, ${input.sourceTransliteration?.trim() || null}),
+          target_transliteration = COALESCE(target_transliteration, ${input.targetTransliteration?.trim() || null}),
+          source_plural_text = COALESCE(source_plural_text, ${input.sourcePluralText?.trim() || null}),
+          target_plural_text = COALESCE(target_plural_text, ${input.targetPluralText?.trim() || null}),
+          source_plural_transliteration = COALESCE(source_plural_transliteration, ${input.sourcePluralTransliteration?.trim() || null}),
+          target_plural_transliteration = COALESCE(target_plural_transliteration, ${input.targetPluralTransliteration?.trim() || null}),
           updated_at = ${updatedAt}
       WHERE user_id = ${userId} AND id = ${id}
     `;
@@ -111,6 +138,12 @@ async function reactivateFlashcardWithClient(sql: DbQueryable, userId: number, i
   await sql`
     UPDATE flashcards
     SET is_active = TRUE,
+        source_transliteration = COALESCE(source_transliteration, ${input.sourceTransliteration?.trim() || null}),
+        target_transliteration = COALESCE(target_transliteration, ${input.targetTransliteration?.trim() || null}),
+        source_plural_text = COALESCE(source_plural_text, ${input.sourcePluralText?.trim() || null}),
+        target_plural_text = COALESCE(target_plural_text, ${input.targetPluralText?.trim() || null}),
+        source_plural_transliteration = COALESCE(source_plural_transliteration, ${input.sourcePluralTransliteration?.trim() || null}),
+        target_plural_transliteration = COALESCE(target_plural_transliteration, ${input.targetPluralTransliteration?.trim() || null}),
         updated_at = ${updatedAt}
     WHERE user_id = ${userId} AND id = ${id}
   `;
@@ -147,7 +180,7 @@ export async function createFlashcard(userId: number, input: CreateFlashcardRequ
   return db.begin(async (sql) => {
     const existing = await findFlashcardByPhraseWithClient(sql, userId, input);
     if (existing) {
-      await reactivateFlashcardWithClient(sql, userId, existing.id, imageData);
+      await reactivateFlashcardWithClient(sql, userId, existing.id, input, imageData);
       return getFlashcardByIdWithClient(sql, userId, existing.id);
     }
 
@@ -157,8 +190,14 @@ export async function createFlashcard(userId: number, input: CreateFlashcardRequ
         user_id,
         source_text,
         source_language,
+        source_transliteration,
+        source_plural_text,
+        source_plural_transliteration,
         target_text,
         target_language,
+        target_transliteration,
+        target_plural_text,
+        target_plural_transliteration,
         part_of_speech,
         noun_gender,
         image_prompt,
@@ -176,8 +215,14 @@ export async function createFlashcard(userId: number, input: CreateFlashcardRequ
         ${userId},
         ${input.sourceText.trim()},
         ${input.sourceLanguage},
+        ${input.sourceTransliteration?.trim() || null},
+        ${input.sourcePluralText?.trim() || null},
+        ${input.sourcePluralTransliteration?.trim() || null},
         ${input.targetText.trim()},
         ${input.targetLanguage},
+        ${input.targetTransliteration?.trim() || null},
+        ${input.targetPluralText?.trim() || null},
+        ${input.targetPluralTransliteration?.trim() || null},
         ${input.partOfSpeech},
         ${input.nounGender},
         ${input.imagePrompt ?? ""},
@@ -209,6 +254,7 @@ export async function updateFlashcardReviewState(
     consecutiveCorrect: number;
     lastReviewedAt: string;
     lastResult: ReviewResult;
+    masteredAt?: string | null;
   }
 ) {
   const updatedAt = new Date().toISOString();
@@ -220,6 +266,7 @@ export async function updateFlashcardReviewState(
         consecutive_correct = ${updates.consecutiveCorrect},
         last_reviewed_at = ${updates.lastReviewedAt},
         last_result = ${updates.lastResult},
+        mastered_at = COALESCE(mastered_at, ${updates.masteredAt ?? null}),
         updated_at = ${updatedAt}
     WHERE user_id = ${userId} AND id = ${id}
     RETURNING *
@@ -256,7 +303,7 @@ export async function getDeckStats(userId: number): Promise<DeckStats> {
             OR last_reviewed_at <= NOW() - INTERVAL '30 minutes'
           )
       )::int AS due_soon,
-      COUNT(*) FILTER (WHERE weight > 0.8)::int AS learned_words
+      COUNT(*) FILTER (WHERE is_active = TRUE AND weight > ${LEARNED_SCORE_THRESHOLD})::int AS learned_words
     FROM flashcards
     WHERE user_id = ${userId}
   `;
