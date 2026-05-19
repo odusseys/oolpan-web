@@ -4,6 +4,7 @@ import {
   type CreateFlashcardRequest,
   type DeleteFlashcardResponse,
   type FlashcardRecord,
+  type ReviewDirection,
   type ReviewRequest,
   type ReviewResponse,
   type SpeechRequest,
@@ -20,11 +21,11 @@ import {
   listFlashcards,
   updateFlashcardReviewState
 } from "../db/repository.js";
-import { applyReviewOutcome, pickWeightedRandom } from "../lib/scheduler.js";
+import { applyReviewOutcome, computeSamplingWeight, sampleMultipleByScore } from "../lib/scheduler.js";
 import { createAiClient } from "./aiClient.js";
 
 const aiClient = createAiClient();
-const lastServedFlashcardIds = new Map<number, number | null>();
+const lastServedReviewKeys = new Map<number, string | null>();
 
 type RequiredFlashcardPluralization = {
   sourcePluralText: string;
@@ -35,8 +36,53 @@ function toImageUrl(imageData: string | null) {
   return imageData;
 }
 
-function toStudyCard(card: FlashcardRecord): StudyCard {
-  const promptSide = Math.random() > 0.5 ? "source" : "target";
+function reviewKey(cardId: number, direction: ReviewDirection) {
+  return `${cardId}:${direction}`;
+}
+
+function getDirectionProgress(card: FlashcardRecord, direction: ReviewDirection) {
+  if (direction === "source_to_target") {
+    return {
+      weight: card.sourceToTargetWeight,
+      reviewCount: card.sourceToTargetReviewCount,
+      mistakeCount: card.sourceToTargetMistakeCount,
+      consecutiveCorrect: card.sourceToTargetConsecutiveCorrect,
+      lastReviewedAt: card.sourceToTargetLastReviewedAt,
+      lastResult: card.sourceToTargetLastResult,
+      masteredAt: card.sourceToTargetMasteredAt
+    };
+  }
+
+  return {
+    weight: card.targetToSourceWeight,
+    reviewCount: card.targetToSourceReviewCount,
+    mistakeCount: card.targetToSourceMistakeCount,
+    consecutiveCorrect: card.targetToSourceConsecutiveCorrect,
+    lastReviewedAt: card.targetToSourceLastReviewedAt,
+    lastResult: card.targetToSourceLastResult,
+    masteredAt: card.targetToSourceMasteredAt
+  };
+}
+
+function getOppositeDirection(direction: ReviewDirection): ReviewDirection {
+  return direction === "source_to_target" ? "target_to_source" : "source_to_target";
+}
+
+function getReviewCandidates(cards: FlashcardRecord[], now = new Date()) {
+  return cards.flatMap((card) =>
+    (["source_to_target", "target_to_source"] as const).map((direction) => {
+      const progress = getDirectionProgress(card, direction);
+      return {
+        card,
+        direction,
+        samplingWeight: computeSamplingWeight(progress, now)
+      };
+    })
+  );
+}
+
+function toStudyCard(card: FlashcardRecord, reviewDirection: ReviewDirection): StudyCard {
+  const promptSide = reviewDirection === "source_to_target" ? "source" : "target";
   const hasPluralForm = Boolean(card.sourcePluralText?.trim() && card.targetPluralText?.trim());
   const numberForm = hasPluralForm && Math.random() > 0.5 ? "plural" : "singular";
   const sourceText = numberForm === "plural" ? (card.sourcePluralText ?? card.sourceText) : card.sourceText;
@@ -49,6 +95,7 @@ function toStudyCard(card: FlashcardRecord): StudyCard {
   return {
     ...card,
     promptSide,
+    reviewDirection,
     numberForm,
     promptText: promptSide === "source" ? sourceText : targetText,
     promptLanguage: promptSide === "source" ? card.sourceLanguage : card.targetLanguage,
@@ -57,7 +104,9 @@ function toStudyCard(card: FlashcardRecord): StudyCard {
     answerLanguage: promptSide === "source" ? card.targetLanguage : card.sourceLanguage,
     answerTransliteration: promptSide === "source" ? targetTransliteration : sourceTransliteration,
     imageUrl: toImageUrl(card.imageData),
-    samplingWeight: 0
+    samplingWeight: 0,
+    directionWeight: getDirectionProgress(card, reviewDirection).weight,
+    directionReviewCount: getDirectionProgress(card, reviewDirection).reviewCount
   };
 }
 
@@ -212,31 +261,27 @@ export async function createFlashcardWithImage(userId: number, input: CreateFlas
   };
 }
 
-export async function getNextStudyCard(userId: number, excludedIds: number[] = []) {
+export async function getNextStudyCard(userId: number, excludedReviewKeyValues: string[] = []) {
   const cards = await listFlashcards(userId);
-  if (cards.length === 1) {
-    const onlyCard = cards[0];
-    if (!onlyCard) {
-      return null;
-    }
-
-    const singleCard = toStudyCard(onlyCard);
-    singleCard.samplingWeight = pickWeightedRandom(cards, new Date(), [])?.samplingWeight ?? 0;
-    lastServedFlashcardIds.set(userId, singleCard.id);
-    return singleCard;
+  const now = new Date();
+  const excludedReviewKeys = new Set(excludedReviewKeyValues);
+  const lastServedReviewKey = lastServedReviewKeys.get(userId) ?? null;
+  if (lastServedReviewKey) {
+    excludedReviewKeys.add(lastServedReviewKey);
   }
 
-  const lastServedFlashcardId = lastServedFlashcardIds.get(userId) ?? null;
-  const effectiveExcludedIds =
-    lastServedFlashcardId !== null ? Array.from(new Set([...excludedIds, lastServedFlashcardId])) : excludedIds;
-  const picked = pickWeightedRandom(cards, new Date(), effectiveExcludedIds) ?? pickWeightedRandom(cards, new Date(), excludedIds);
+  const candidates = getReviewCandidates(cards, now);
+  const eligibleCandidates = candidates.filter((candidate) => !excludedReviewKeys.has(reviewKey(candidate.card.id, candidate.direction)));
+  const picked =
+    sampleMultipleByScore(eligibleCandidates, (candidate) => candidate.samplingWeight, 1)[0] ??
+    sampleMultipleByScore(candidates, (candidate) => candidate.samplingWeight, 1)[0];
   if (!picked) {
     return null;
   }
 
-  const card = toStudyCard(picked.card);
+  const card = toStudyCard(picked.card, picked.direction);
   card.samplingWeight = picked.samplingWeight;
-  lastServedFlashcardIds.set(userId, card.id);
+  lastServedReviewKeys.set(userId, reviewKey(card.id, picked.direction));
   return card;
 }
 
@@ -287,12 +332,19 @@ export async function reviewCard(userId: number, cardId: number, body: ReviewReq
     throw new Error("Flashcard not found");
   }
 
-  const updates = applyReviewOutcome(card, body.result);
+  const directionProgress = getDirectionProgress(card, body.direction);
+  const oppositeProgress = getDirectionProgress(card, getOppositeDirection(body.direction));
+  const updates = applyReviewOutcome(directionProgress, body.result);
   const isNewlyMastered =
-    !card.masteredAt && card.weight <= LEARNED_SCORE_THRESHOLD && updates.weight > LEARNED_SCORE_THRESHOLD;
-  const updatedCard = await updateFlashcardReviewState(userId, cardId, {
+    !directionProgress.masteredAt &&
+    directionProgress.weight <= LEARNED_SCORE_THRESHOLD &&
+    updates.weight > LEARNED_SCORE_THRESHOLD;
+  const isNewlyFullyMastered =
+    !card.masteredAt && updates.weight > LEARNED_SCORE_THRESHOLD && oppositeProgress.weight > LEARNED_SCORE_THRESHOLD;
+  const updatedCard = await updateFlashcardReviewState(userId, cardId, body.direction, {
     ...updates,
-    masteredAt: isNewlyMastered ? updates.lastReviewedAt : null
+    directionMasteredAt: isNewlyMastered ? updates.lastReviewedAt : null,
+    cardMasteredAt: isNewlyFullyMastered ? updates.lastReviewedAt : null
   });
 
   if (!updatedCard) {
@@ -301,12 +353,13 @@ export async function reviewCard(userId: number, cardId: number, body: ReviewReq
 
   return {
     updatedCard,
-    nextCard: await getNextStudyCard(userId, [cardId]),
+    nextCard: await getNextStudyCard(userId, [reviewKey(cardId, body.direction)]),
     stats: await getDeckStats(userId),
     masteredFlashcard: isNewlyMastered
       ? {
           id: updatedCard.id,
-          text: getMasteredFlashcardText(updatedCard)
+          text: getMasteredFlashcardText(updatedCard),
+          direction: body.direction
         }
       : null
   };
@@ -318,13 +371,14 @@ export async function removeFlashcard(userId: number, cardId: number): Promise<D
     throw new Error("Flashcard not found");
   }
 
-  if ((lastServedFlashcardIds.get(userId) ?? null) === cardId) {
-    lastServedFlashcardIds.set(userId, null);
+  const lastServedReviewKey = lastServedReviewKeys.get(userId) ?? null;
+  if (lastServedReviewKey?.startsWith(`${cardId}:`)) {
+    lastServedReviewKeys.set(userId, null);
   }
 
   return {
     removedId: cardId,
-    nextCard: await getNextStudyCard(userId, [cardId]),
+    nextCard: await getNextStudyCard(userId),
     stats: await getDeckStats(userId)
   };
 }

@@ -25,6 +25,11 @@ function computeNewScore(score: number, trials: number, success: boolean) {
   return clamp(SCORE_DECAY_FACTOR * rawNewScore + (1 - SCORE_DECAY_FACTOR) * added, MIN_SCORE, MAX_SCORE);
 }
 
+type ReviewProgress = Pick<
+  FlashcardRecord,
+  "weight" | "reviewCount" | "mistakeCount" | "consecutiveCorrect" | "lastReviewedAt" | "lastResult"
+>;
+
 export function sampleMultipleByScore<T>(items: T[], score: (item: T) => number, nSamples = 1): T[] {
   const candidates = [...items];
   const weights = candidates.map((item) => Math.max(0, score(item)));
@@ -59,30 +64,30 @@ export function sampleMultipleByScore<T>(items: T[], score: (item: T) => number,
   return sampled;
 }
 
-export function applyReviewOutcome(card: FlashcardRecord, result: ReviewResult, now = new Date()) {
+export function applyReviewOutcome(progress: ReviewProgress, result: ReviewResult, now = new Date()) {
   const success = result === "got_it";
-  const effectiveTrials = Math.max(card.reviewCount, DEFAULT_ADAPTIVE_INITIAL_TRIALS);
-  const nextReviewCount = card.reviewCount + 1;
-  const nextScore = computeNewScore(card.weight, effectiveTrials, success);
+  const effectiveTrials = Math.max(progress.reviewCount, DEFAULT_ADAPTIVE_INITIAL_TRIALS);
+  const nextReviewCount = progress.reviewCount + 1;
+  const nextScore = computeNewScore(progress.weight, effectiveTrials, success);
 
   return {
     weight: nextScore,
     reviewCount: nextReviewCount,
-    mistakeCount: success ? card.mistakeCount : card.mistakeCount + 1,
-    consecutiveCorrect: success ? card.consecutiveCorrect + 1 : 0,
+    mistakeCount: success ? progress.mistakeCount : progress.mistakeCount + 1,
+    consecutiveCorrect: success ? progress.consecutiveCorrect + 1 : 0,
     lastReviewedAt: now.toISOString(),
     lastResult: result
   };
 }
 
-export function computeSamplingWeight(card: FlashcardRecord, now = new Date()) {
-  const recencyMinutes = minutesSince(card.lastReviewedAt, now);
-  const noveltyMultiplier = card.reviewCount < DEFAULT_ADAPTIVE_INITIAL_TRIALS ? 1.35 : 1;
-  const strugglingBoost = card.lastResult === "oops" ? 1.25 : 1;
+export function computeSamplingWeight(progress: ReviewProgress, now = new Date()) {
+  const recencyMinutes = minutesSince(progress.lastReviewedAt, now);
+  const noveltyMultiplier = progress.reviewCount < DEFAULT_ADAPTIVE_INITIAL_TRIALS ? 1.35 : 1;
+  const strugglingBoost = progress.lastResult === "oops" ? 1.25 : 1;
   const ageBoost = Number.isFinite(recencyMinutes)
     ? clamp(1 + recencyMinutes / (60 * 24), 1, 2.4)
     : 1.3;
-  const masteryNeed = clamp(1.15 - card.weight, 0.08, 1.2);
+  const masteryNeed = clamp(1.15 - progress.weight, 0.08, 1.2);
 
   let recencyPenalty = 1;
   if (recencyMinutes < 1) {

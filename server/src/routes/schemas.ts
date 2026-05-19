@@ -1,4 +1,4 @@
-import { nounGenderOptions, partOfSpeechOptions, reviewResults } from "@study/shared";
+import { nounGenderOptions, partOfSpeechOptions, reviewDirections, reviewResults } from "@study/shared";
 import { z } from "zod";
 
 const languageSchema = z.enum(["en", "he"]);
@@ -32,7 +32,8 @@ export const createFlashcardRequestSchema = z.object({
 });
 
 export const reviewRequestSchema = z.object({
-  result: z.enum(reviewResults)
+  result: z.enum(reviewResults),
+  direction: z.enum(reviewDirections)
 });
 
 export const registerUserRequestSchema = z.object({

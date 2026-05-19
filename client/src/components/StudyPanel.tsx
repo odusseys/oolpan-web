@@ -37,9 +37,9 @@ export function StudyPanel({
 
   useEffect(() => {
     setMenuOpen(false);
-  }, [card?.id]);
+  }, [card?.id, card?.reviewDirection]);
 
-  const score = card ? card.weight.toFixed(2) : null;
+  const score = card ? card.directionWeight.toFixed(2) : null;
   const promptAudioKey = card ? `flashcard:${card.id}:prompt:${card.promptLanguage}:${card.promptText}` : null;
   const answerAudioKey = card ? `flashcard:${card.id}:answer:${card.answerLanguage}:${card.answerText}` : null;
   const canSpeakPrompt = card?.promptLanguage === "he";

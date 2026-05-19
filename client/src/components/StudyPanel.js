@@ -5,8 +5,8 @@ export function StudyPanel({ uiLanguage, card, isRevealed, isBusy, pendingReview
     const [menuOpen, setMenuOpen] = useState(false);
     useEffect(() => {
         setMenuOpen(false);
-    }, [card?.id]);
-    const score = card ? card.weight.toFixed(2) : null;
+    }, [card?.id, card?.reviewDirection]);
+    const score = card ? card.directionWeight.toFixed(2) : null;
     const promptAudioKey = card ? `flashcard:${card.id}:prompt:${card.promptLanguage}:${card.promptText}` : null;
     const answerAudioKey = card ? `flashcard:${card.id}:answer:${card.answerLanguage}:${card.answerText}` : null;
     const canSpeakPrompt = card?.promptLanguage === "he";

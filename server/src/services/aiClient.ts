@@ -20,9 +20,9 @@ type GeneratedImage = {
 type GeneratedSpeech = SpeechResponse;
 
 const IMAGE_STYLE_DESCRIPTOR =
-  "cel shaded Pixar aesthetic, soft cinematic volumetric lighting, vibrant colors, whimsical, cel shading, hybrid 2D/3D aesthetic, simple";
+  "Pixar-inspired 3D animated film aesthetic, soft cinematic lighting, natural vibrant colors, gentle depth of field, warm educational illustration style, simple composition";
 const IMAGE_SCENE_REQUIREMENTS =
-  "For ordinary vocabulary, show the most literal, direct, and easily recognizable real-world subject or action. Avoid abstract metaphors, symbolic substitutions, visual puns, surreal scenes, or far-fetched associations unless required for adult-safety. Describe a detailed scene with a clear subject, visible environment, layered background elements, and non-solid surroundings. Never include written text, letters, captions, labels, signage, or typography anywhere in the image.";
+  "For ordinary vocabulary, show the most literal, direct, and easily recognizable real-world subject or action. Keep the scene purely visual, concrete, and simple. Use one clear subject or action in a real-world setting with only a few relevant visual details. Avoid abstract metaphors, symbolic substitutions, visual puns, surreal scenes, far-fetched associations, complex narratives, or busy compositions unless required for adult-safety. Never include written text, letters, captions, labels, signage, or typography anywhere in the image.";
 const ADULT_CONTENT_REQUIREMENTS =
   "If the vocabulary could be adult, sexual, intimate, or explicit in nature, use a metaphorical educational visual only. Do not include nudity, sexual acts, fetish elements, explicit body focus, intimate touching, underwear scenes, or other adult imagery. Prefer symbolic objects, mood, weather, color, distance, or other indirect metaphors.";
 
@@ -330,7 +330,7 @@ class MockAiClient {
     const adultSafety = isPotentiallyAdultMeaning(input)
       ? ", rendered as a metaphorical non-explicit study image with symbolic objects and no adult elements"
       : "";
-    return `A friendly detailed study-card scene that directly and literally shows ${focusText}${adultSafety}, with a clear environment and a rich non-solid background, with no text in the image`;
+    return `A simple study-card scene that directly and literally shows ${focusText}${adultSafety}, in a concrete real-world setting, with no text in the image`;
   }
 
   async generateIllustration(prompt: string) {
@@ -574,10 +574,11 @@ class OpenAiCompatibleAiClient {
     const systemPrompt = [
       "You write image prompts for educational flashcards.",
       "Return JSON only with the key imagePrompt.",
-      "Describe a single vivid scene that shows the meaning of the word or phrase directly and literally.",
+      "Describe a single simple visual scene that shows the meaning of the word or phrase directly and literally.",
       "For ordinary vocabulary, use the obvious real-world object, person, place, or action.",
-      "Avoid abstract metaphors, symbolic substitutions, visual puns, surreal imagery, or far-fetched associations unless adult-safety requires an indirect image.",
-      "Include foreground subject details plus environment and background details.",
+      "Keep the description purely visual, concrete, and easy to recognize at a glance.",
+      "Use one main subject or action, one clear setting, and only a few relevant visual details.",
+      "Avoid abstract metaphors, symbolic substitutions, visual puns, surreal imagery, far-fetched associations, complex narratives, or busy compositions unless adult-safety requires an indirect image.",
       "Do not include any written text, letters, signage, captions, or labels in the image.",
       "Never use a plain or solid-color background.",
       ADULT_CONTENT_REQUIREMENTS
@@ -760,6 +761,7 @@ class OpenAiCompatibleAiClient {
       "You add nikud to Hebrew text for language learners.",
       "Return JSON only with the key textWithNikud.",
       "Add the correct Hebrew nikud marks to the provided text.",
+      "This is a hard formatting rule: the output must contain the same base letters as the input.",
       "Do not remove any existing Hebrew letters.",
       "Do not replace any existing Hebrew letters.",
       "Do not reorder any existing Hebrew letters.",
@@ -795,7 +797,8 @@ class OpenAiCompatibleAiClient {
     const textWithNikud = parsed.textWithNikud.trim();
 
     if (stripHebrewNikud(textWithNikud) !== stripHebrewNikud(trimmedText)) {
-      throw new Error("Nikud response changed the original Hebrew letters");
+      console.warn("Nikud response changed the original Hebrew letters; keeping original text without generated nikud.");
+      return trimmedText;
     }
 
     return textWithNikud;
@@ -879,11 +882,18 @@ class OpenAiCompatibleAiClient {
       "suggestions must be an array of exactly 10 objects.",
       "Each object must contain englishText.",
       "Generate all suggestions in English only.",
-      "The suggestions should be conceptually or lexically related to the seed items.",
+      "Exactly 8 suggestions should be conceptually or lexically related to the seed items.",
+      "Exactly 2 suggestions, 20 percent of the list, should be completely random and unrelated to the seed items.",
+      "For the unrelated suggestions, choose useful concrete learner vocabulary from different everyday domains.",
       "Maximize diversity: cover different semantic subtopics, situations, parts of speech, and levels of specificity.",
       "Avoid near-synonyms, same-root variants, plural-only variants, and repeated everyday objects from the same narrow category.",
       "Do not include any item from the avoid list, and do not include close paraphrases of avoid-list items.",
+      "Do not suggest low-value function words such as prepositions, conjunctions, articles, pronouns, particles, or auxiliary verbs.",
+      "Do not suggest very simple standalone words like 'in', 'on', 'at', 'of', 'and', 'or', 'the', 'a', 'this', 'that', 'is', or 'to'.",
       "Include a balanced mix of nouns, verbs, adjectives, and exactly 2 multi-word phrases.",
+      "Format verbs as infinitives with 'to' at the beginning, for example 'to cook' instead of 'cook'.",
+      "Format singular count nouns with 'a' at the beginning, for example 'a spoon' instead of 'spoon'.",
+      "Do not add 'a' before uncountable nouns, plural nouns, adjectives, or verb phrases.",
       "Keep each englishText concise and useful for study.",
       "Use the variation token as a branch selector for a fresh set of ideas while keeping them relevant."
     ].join(" ");

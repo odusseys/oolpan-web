@@ -1,4 +1,4 @@
-import type { AppLanguage, StudyCard, SuggestedFlashcard, TranslationResult, User } from "@study/shared";
+import type { AppLanguage, ReviewDirection, StudyCard, SuggestedFlashcard, TranslationResult, User } from "@study/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StudyPanel } from "./components/StudyPanel";
 import { TranslatorPanel } from "./components/TranslatorPanel";
@@ -18,6 +18,7 @@ type SuggestionLoadMode = "replace" | "append";
 type MasteryCelebration = {
   id: number;
   text: string;
+  direction: ReviewDirection;
 };
 const AUTO_SPEAK_HEBREW_STORAGE_KEY = "oolpan_auto_speak_hebrew_flashcards";
 const AUTO_SPEAK_DELAY_MS = 500;
@@ -651,7 +652,7 @@ export default function App() {
     try {
       setIsReviewBusy(true);
       setPendingReviewResult(result);
-      const response = await api.reviewFlashcard(currentCard.id, { result });
+      const response = await api.reviewFlashcard(currentCard.id, { result, direction: currentCard.reviewDirection });
       setCurrentCard(await hydrateStudyCardImage(response.nextCard));
       setLearnedWords(response.stats.learnedWords);
       if (response.masteredFlashcard) {
@@ -1476,6 +1477,15 @@ export default function App() {
                   {suggestions.map((suggestion) => {
                     const isAdded = addedSuggestionIds.has(suggestion.id);
                     const isSavingThisSuggestion = savingSuggestionId === suggestion.id;
+                    const suggestionHebrewText =
+                      suggestion.sourceLanguage === "he"
+                        ? suggestion.sourceText
+                        : suggestion.targetLanguage === "he"
+                          ? suggestion.targetText
+                          : "";
+                    const suggestionAudioKey = suggestionHebrewText
+                      ? `suggestion:${suggestion.id}:he:${suggestionHebrewText}`
+                      : null;
 
                     return (
                       <article key={suggestion.id} className={isAdded ? "suggestion-card suggestion-card-added" : "suggestion-card"}>
@@ -1485,18 +1495,36 @@ export default function App() {
                             {suggestion.targetText}
                           </p>
                         </div>
-                        <button
-                          className={isAdded ? "suggestion-add-button suggestion-add-button-added" : "suggestion-add-button"}
-                          type="button"
-                          disabled={isAdded || savingSuggestionId !== null}
-                          onClick={() => void handleSaveSuggestedFlashcard(suggestion)}
-                        >
-                          <span className="button-content">
-                            {isSavingThisSuggestion ? <span className="button-spinner" aria-hidden="true" /> : null}
-                            {isAdded ? <span className="suggestion-added-check" aria-hidden="true">✓</span> : null}
-                            <span>{isAdded ? t(uiLanguage, "suggestionAddedButton") : t(uiLanguage, "addSuggestion")}</span>
-                          </span>
-                        </button>
+                        <div className="suggestion-actions">
+                          {suggestionAudioKey ? (
+                            <button
+                              className="icon-speak-button suggestion-speak-button"
+                              type="button"
+                              aria-label={t(uiLanguage, "playAudio")}
+                              title={t(uiLanguage, "playAudio")}
+                              disabled={loadingAudioKey !== null}
+                              onClick={() => void handleSpeak(suggestionAudioKey, suggestionHebrewText, "he")}
+                            >
+                              {loadingAudioKey === suggestionAudioKey ? (
+                                <span className="button-spinner" aria-hidden="true" />
+                              ) : (
+                                <span aria-hidden="true">🔊</span>
+                              )}
+                            </button>
+                          ) : null}
+                          <button
+                            className={isAdded ? "suggestion-add-button suggestion-add-button-added" : "suggestion-add-button"}
+                            type="button"
+                            disabled={isAdded || savingSuggestionId !== null}
+                            onClick={() => void handleSaveSuggestedFlashcard(suggestion)}
+                          >
+                            <span className="button-content">
+                              {isSavingThisSuggestion ? <span className="button-spinner" aria-hidden="true" /> : null}
+                              {isAdded ? <span className="suggestion-added-check" aria-hidden="true">✓</span> : null}
+                              <span>{isAdded ? t(uiLanguage, "suggestionAddedButton") : t(uiLanguage, "addSuggestion")}</span>
+                            </span>
+                          </button>
+                        </div>
                       </article>
                     );
                   })}

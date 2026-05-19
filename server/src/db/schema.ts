@@ -65,6 +65,20 @@ async function createSchema() {
         review_count INTEGER NOT NULL DEFAULT 0,
         mistake_count INTEGER NOT NULL DEFAULT 0,
         consecutive_correct INTEGER NOT NULL DEFAULT 0,
+        source_to_target_weight DOUBLE PRECISION NOT NULL DEFAULT ${DEFAULT_ADAPTIVE_LEARNING_SCORE},
+        source_to_target_review_count INTEGER NOT NULL DEFAULT 0,
+        source_to_target_mistake_count INTEGER NOT NULL DEFAULT 0,
+        source_to_target_consecutive_correct INTEGER NOT NULL DEFAULT 0,
+        source_to_target_last_reviewed_at TIMESTAMPTZ,
+        source_to_target_last_result TEXT,
+        source_to_target_mastered_at TIMESTAMPTZ,
+        target_to_source_weight DOUBLE PRECISION NOT NULL DEFAULT ${DEFAULT_ADAPTIVE_LEARNING_SCORE},
+        target_to_source_review_count INTEGER NOT NULL DEFAULT 0,
+        target_to_source_mistake_count INTEGER NOT NULL DEFAULT 0,
+        target_to_source_consecutive_correct INTEGER NOT NULL DEFAULT 0,
+        target_to_source_last_reviewed_at TIMESTAMPTZ,
+        target_to_source_last_result TEXT,
+        target_to_source_mastered_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL,
         last_reviewed_at TIMESTAMPTZ,
@@ -120,10 +134,101 @@ async function createSchema() {
       ADD COLUMN IF NOT EXISTS mastered_at TIMESTAMPTZ
     `;
 
+    await sql.unsafe(`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_to_target_weight DOUBLE PRECISION NOT NULL DEFAULT ${DEFAULT_ADAPTIVE_LEARNING_SCORE}
+    `);
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_to_target_review_count INTEGER NOT NULL DEFAULT 0
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_to_target_mistake_count INTEGER NOT NULL DEFAULT 0
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_to_target_consecutive_correct INTEGER NOT NULL DEFAULT 0
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_to_target_last_reviewed_at TIMESTAMPTZ
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_to_target_last_result TEXT
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS source_to_target_mastered_at TIMESTAMPTZ
+    `;
+
+    await sql.unsafe(`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_to_source_weight DOUBLE PRECISION NOT NULL DEFAULT ${DEFAULT_ADAPTIVE_LEARNING_SCORE}
+    `);
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_to_source_review_count INTEGER NOT NULL DEFAULT 0
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_to_source_mistake_count INTEGER NOT NULL DEFAULT 0
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_to_source_consecutive_correct INTEGER NOT NULL DEFAULT 0
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_to_source_last_reviewed_at TIMESTAMPTZ
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_to_source_last_result TEXT
+    `;
+
+    await sql`
+      ALTER TABLE flashcards
+      ADD COLUMN IF NOT EXISTS target_to_source_mastered_at TIMESTAMPTZ
+    `;
+
     await sql`
       UPDATE flashcards
       SET mastered_at = COALESCE(mastered_at, updated_at)
       WHERE weight > ${LEARNED_SCORE_THRESHOLD}
+    `;
+
+    await sql`
+      UPDATE flashcards
+      SET source_to_target_weight = weight,
+          source_to_target_review_count = review_count,
+          source_to_target_mistake_count = mistake_count,
+          source_to_target_consecutive_correct = consecutive_correct,
+          source_to_target_last_reviewed_at = last_reviewed_at,
+          source_to_target_last_result = last_result,
+          source_to_target_mastered_at = mastered_at,
+          target_to_source_weight = weight,
+          target_to_source_review_count = review_count,
+          target_to_source_mistake_count = mistake_count,
+          target_to_source_consecutive_correct = consecutive_correct,
+          target_to_source_last_reviewed_at = last_reviewed_at,
+          target_to_source_last_result = last_result,
+          target_to_source_mastered_at = mastered_at
+      WHERE review_count > 0
+        AND source_to_target_review_count = 0
+        AND target_to_source_review_count = 0
     `;
   });
 }

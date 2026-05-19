@@ -730,6 +730,19 @@ textarea {
   color: #6a4e87;
 }
 
+.suggestion-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.suggestion-speak-button {
+  width: 32px;
+  height: 32px;
+  box-shadow: none;
+}
+
 .suggestion-add-button {
   justify-self: start;
   min-height: 32px;

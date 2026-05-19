@@ -4,6 +4,8 @@ export type AppLanguage = (typeof languages)[number];
 
 export const reviewResults = ["oops", "got_it"] as const;
 export type ReviewResult = (typeof reviewResults)[number];
+export const reviewDirections = ["source_to_target", "target_to_source"] as const;
+export type ReviewDirection = (typeof reviewDirections)[number];
 export const LEARNED_SCORE_THRESHOLD = 0.8;
 
 export const partOfSpeechOptions = ["noun", "verb", "adjective", "phrase", "other"] as const;
@@ -67,6 +69,20 @@ export interface FlashcardRecord {
   reviewCount: number;
   mistakeCount: number;
   consecutiveCorrect: number;
+  sourceToTargetWeight: number;
+  sourceToTargetReviewCount: number;
+  sourceToTargetMistakeCount: number;
+  sourceToTargetConsecutiveCorrect: number;
+  sourceToTargetLastReviewedAt: string | null;
+  sourceToTargetLastResult: ReviewResult | null;
+  sourceToTargetMasteredAt: string | null;
+  targetToSourceWeight: number;
+  targetToSourceReviewCount: number;
+  targetToSourceMistakeCount: number;
+  targetToSourceConsecutiveCorrect: number;
+  targetToSourceLastReviewedAt: string | null;
+  targetToSourceLastResult: ReviewResult | null;
+  targetToSourceMasteredAt: string | null;
   createdAt: string;
   updatedAt: string;
   lastReviewedAt: string | null;
@@ -77,6 +93,7 @@ export interface FlashcardRecord {
 
 export interface StudyCard extends FlashcardRecord {
   promptSide: "source" | "target";
+  reviewDirection: ReviewDirection;
   numberForm: "singular" | "plural";
   promptText: string;
   promptLanguage: AppLanguage;
@@ -86,10 +103,13 @@ export interface StudyCard extends FlashcardRecord {
   answerTransliteration: string | null;
   imageUrl: string | null;
   samplingWeight: number;
+  directionWeight: number;
+  directionReviewCount: number;
 }
 
 export interface ReviewRequest {
   result: ReviewResult;
+  direction: ReviewDirection;
 }
 
 export interface DeckStats {
@@ -107,6 +127,7 @@ export interface ReviewResponse {
   masteredFlashcard: {
     id: number;
     text: string;
+    direction: ReviewDirection;
   } | null;
 }
 
