@@ -87,4 +87,12 @@ describe("scheduler", () => {
     );
     expect(fresh).toBeLessThan(older);
   });
+
+  it("strongly favors poorly scored review directions", () => {
+    const now = new Date("2026-04-02T00:00:00.000Z");
+    const weak = computeSamplingWeight(makeCard({ weight: 0.15, reviewCount: 5 }), now);
+    const strong = computeSamplingWeight(makeCard({ weight: 0.8, reviewCount: 5 }), now);
+
+    expect(weak).toBeGreaterThan(strong * 8);
+  });
 });

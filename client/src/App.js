@@ -109,6 +109,7 @@ export default function App() {
     const uiLanguage = "en";
     const [currentUser, setCurrentUser] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
+    const [startupError, setStartupError] = useState(null);
     const [authMode, setAuthMode] = useState("login");
     const [authUsername, setAuthUsername] = useState("");
     const [authPassword, setAuthPassword] = useState("");
@@ -347,7 +348,9 @@ export default function App() {
                     pushToast(t(uiLanguage, "authSessionExpired"), "error");
                     return;
                 }
-                pushToast(requestError instanceof Error ? requestError.message : "Unknown error", "error");
+                setStartupError({
+                    message: requestError instanceof Error ? requestError.message : "Unknown error"
+                });
             }
         })
             .catch((requestError) => {
@@ -359,7 +362,9 @@ export default function App() {
                 pushToast(t(uiLanguage, "authSessionExpired"), "error");
                 return;
             }
-            pushToast(requestError instanceof Error ? requestError.message : "Unknown error", "error");
+            setStartupError({
+                message: requestError instanceof Error ? requestError.message : "Unknown error"
+            });
         })
             .finally(() => {
             if (!isCancelled) {
@@ -849,6 +854,9 @@ export default function App() {
     }
     if (!isAuthReady) {
         return (_jsxs("div", { className: "app-shell", dir: appDirection, children: [_jsx("div", { className: "background-glow glow-one" }), _jsx("div", { className: "background-glow glow-two" }), _jsx("div", { className: "background-glow glow-three" }), _jsx("div", { className: "background-glow glow-four" }), _jsx("div", { className: "background-glow glow-five" }), _jsx("div", { className: "background-glow glow-six" }), _jsx("main", { className: "auth-shell", children: _jsx("section", { className: "panel auth-panel auth-panel-loading", children: _jsx("span", { className: "button-spinner", "aria-hidden": "true" }) }) })] }));
+    }
+    if (startupError) {
+        return (_jsxs("div", { className: "app-shell", dir: appDirection, children: [_jsx("div", { className: "background-glow glow-one" }), _jsx("div", { className: "background-glow glow-two" }), _jsx("div", { className: "background-glow glow-three" }), _jsx("main", { className: "auth-shell", children: _jsxs("section", { className: "panel auth-panel app-error-panel", children: [_jsx("img", { className: "brand-logo auth-logo", src: "/oolpan-logo.png", alt: "Oolpan" }), _jsx("h1", { children: "Something went wrong" }), _jsx("p", { className: "auth-password-warning", children: "The app could not finish loading. This is usually temporary." }), _jsx("p", { className: "app-error-detail", children: startupError.message }), _jsx("button", { className: "primary-button auth-inline-button", type: "button", onClick: () => window.location.reload(), children: _jsx("span", { className: "button-content", children: _jsx("span", { children: "Reload" }) }) })] }) })] }));
     }
     if (!currentUser) {
         return (_jsxs("div", { className: "app-shell", dir: appDirection, children: [_jsx("div", { className: "background-glow glow-one" }), _jsx("div", { className: "background-glow glow-two" }), _jsx("div", { className: "background-glow glow-three" }), _jsx("div", { className: "background-glow glow-four" }), _jsx("div", { className: "background-glow glow-five" }), _jsx("div", { className: "background-glow glow-six" }), _jsx("div", { className: "toast-stack", "aria-live": "polite", "aria-atomic": "true", children: toasts.map((toast) => (_jsx("div", { className: toast.tone === "error" ? "toast toast-error" : "toast toast-success", children: toast.message }, toast.id))) }), _jsx("main", { className: "auth-shell", children: _jsxs("section", { className: "panel auth-panel", children: [_jsx("img", { className: "brand-logo auth-logo", src: "/oolpan-logo.png", alt: "Oolpan" }), _jsxs("div", { className: "auth-tabs", role: "tablist", "aria-label": "Authentication", children: [_jsx("button", { type: "button", className: authMode === "login" ? "mobile-tab active" : "mobile-tab", onClick: () => setAuthMode("login"), children: t(uiLanguage, "authLoginTab") }), _jsx("button", { type: "button", className: authMode === "register" ? "mobile-tab active" : "mobile-tab", onClick: () => setAuthMode("register"), children: t(uiLanguage, "authRegisterTab") })] }), _jsxs("label", { className: "auth-field", children: [_jsx("span", { children: t(uiLanguage, "authUsernameLabel") }), _jsx("input", { value: authUsername, onChange: (event) => setAuthUsername(event.target.value), placeholder: t(uiLanguage, "authUsernamePlaceholder"), autoCapitalize: "none", autoCorrect: "off" })] }), authMode === "login" ? (_jsxs("label", { className: "auth-field", children: [_jsx("span", { children: t(uiLanguage, "authPasswordLabel") }), _jsx("input", { type: "password", value: authPassword, onChange: (event) => setAuthPassword(event.target.value), placeholder: t(uiLanguage, "authPasswordPlaceholder") })] })) : (_jsx("p", { className: "auth-hint", children: t(uiLanguage, "authRegisterHint") })), _jsx("button", { className: "primary-button auth-submit-button", type: "button", disabled: !authUsername.trim() || (authMode === "login" && !authPassword) || isAuthBusy || isGoogleAuthBusy, onClick: () => void handleSubmitAuth(), children: _jsxs("span", { className: "button-content", children: [isAuthBusy ? _jsx("span", { className: "button-spinner", "aria-hidden": "true" }) : null, _jsx("span", { children: authMode === "register"

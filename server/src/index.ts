@@ -1,6 +1,8 @@
 import { getApp } from "./app.js";
 import { appConfig } from "./config.js";
+import { initializeSchema } from "./db/schema.js";
 
+await initializeSchema();
 const app = await getApp();
 
 app.listen(appConfig.port, () => {

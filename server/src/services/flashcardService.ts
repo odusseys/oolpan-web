@@ -117,6 +117,10 @@ function hasRequiredHebrewTransliteration(card: FlashcardRecord) {
   return sourceReady && targetReady;
 }
 
+function hasHebrewNikud(text: string) {
+  return /[\u0591-\u05C7]/u.test(text.normalize("NFC"));
+}
+
 function getMasteredFlashcardText(card: FlashcardRecord) {
   if (card.targetLanguage === "he") {
     return card.targetText;
@@ -145,6 +149,10 @@ async function addHebrewNikud(text: string, language: AppLanguage) {
   const trimmedText = text.trim();
 
   if (language !== "he") {
+    return trimmedText;
+  }
+
+  if (hasHebrewNikud(trimmedText)) {
     return trimmedText;
   }
 
@@ -205,6 +213,44 @@ async function addNikudToPluralization(input: CreateFlashcardRequest, pluralizat
   };
 }
 
+async function getImagePrompt(input: CreateFlashcardRequest, existing: FlashcardRecord | null) {
+  if (input.imagePrompt?.trim()) {
+    return input.imagePrompt.trim();
+  }
+
+  if (existing?.imagePrompt?.trim()) {
+    return existing.imagePrompt.trim();
+  }
+
+  return aiClient.describeFlashcardScene({
+    sourceText: input.sourceText,
+    sourceLanguage: input.sourceLanguage,
+    targetText: input.targetText,
+    targetLanguage: input.targetLanguage
+  });
+}
+
+async function getSingularTransliterations(input: CreateFlashcardRequest) {
+  return Promise.all([
+    getHebrewTransliteration(input.sourceText, input.sourceLanguage, input.sourceTransliteration),
+    getHebrewTransliteration(input.targetText, input.targetLanguage, input.targetTransliteration)
+  ]);
+}
+
+async function getPluralTransliterations(
+  input: CreateFlashcardRequest,
+  pluralization: RequiredFlashcardPluralization | null
+) {
+  if (!pluralization) {
+    return [null, null] as const;
+  }
+
+  return Promise.all([
+    getHebrewTransliteration(pluralization.sourcePluralText, input.sourceLanguage, input.sourcePluralTransliteration),
+    getHebrewTransliteration(pluralization.targetPluralText, input.targetLanguage, input.targetPluralTransliteration)
+  ]);
+}
+
 export async function createFlashcardWithImage(userId: number, input: CreateFlashcardRequest) {
   const normalizedInput = await addNikudToFlashcardInput(input);
   const existing = await findFlashcardByPhrase(userId, normalizedInput);
@@ -215,27 +261,30 @@ export async function createFlashcardWithImage(userId: number, input: CreateFlas
     };
   }
 
-  const imagePrompt =
-    normalizedInput.imagePrompt ?? existing?.imagePrompt ?? (await aiClient.describeFlashcardScene({
-      sourceText: normalizedInput.sourceText,
-      sourceLanguage: normalizedInput.sourceLanguage,
-      targetText: normalizedInput.targetText,
-      targetLanguage: normalizedInput.targetLanguage
-    }));
-  const pluralization = await addNikudToPluralization(normalizedInput, await getPluralization(normalizedInput));
-  const [sourceTransliteration, targetTransliteration] = await Promise.all([
-    getHebrewTransliteration(normalizedInput.sourceText, normalizedInput.sourceLanguage, normalizedInput.sourceTransliteration),
-    getHebrewTransliteration(normalizedInput.targetText, normalizedInput.targetLanguage, normalizedInput.targetTransliteration)
+  const imagePromptPromise = getImagePrompt(normalizedInput, existing);
+  const pluralizationPromise = getPluralization(normalizedInput).then((pluralization) =>
+    addNikudToPluralization(normalizedInput, pluralization)
+  );
+  const singularTransliterationsPromise = getSingularTransliterations(normalizedInput);
+  const pluralTransliterationsPromise = pluralizationPromise.then((pluralization) =>
+    getPluralTransliterations(normalizedInput, pluralization)
+  );
+  const generatedPromise = existing?.imageData
+    ? Promise.resolve(null)
+    : imagePromptPromise.then((imagePrompt) => aiClient.generateIllustration(imagePrompt));
+  const [
+    imagePrompt,
+    pluralization,
+    [sourceTransliteration, targetTransliteration],
+    [sourcePluralTransliteration, targetPluralTransliteration],
+    generated
+  ] = await Promise.all([
+    imagePromptPromise,
+    pluralizationPromise,
+    singularTransliterationsPromise,
+    pluralTransliterationsPromise,
+    generatedPromise
   ]);
-  const [sourcePluralTransliteration, targetPluralTransliteration] = await Promise.all([
-    pluralization?.sourcePluralText
-      ? getHebrewTransliteration(pluralization.sourcePluralText, normalizedInput.sourceLanguage, normalizedInput.sourcePluralTransliteration)
-      : null,
-    pluralization?.targetPluralText
-      ? getHebrewTransliteration(pluralization.targetPluralText, normalizedInput.targetLanguage, normalizedInput.targetPluralTransliteration)
-      : null
-  ]);
-  const generated = existing?.imageData ? null : await aiClient.generateIllustration(imagePrompt);
   const saved = await createFlashcard(
     userId,
     {

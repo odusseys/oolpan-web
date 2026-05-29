@@ -1,0 +1,399 @@
+english: The teacher says that distinguishing colors is very important for young children.
+correct: المعلمة بتقول إنه تمييز الألوان مهم كتير للأطفال الصغار.
+by gpt: المعلمة بتقول إنه تمييز الألوان مهم كتير للأطفال الصغار.
+
+english: I wish we could solve all the complexities of life easily, but that is impossible.
+correct: يا ريت نقدر نحل كل تعقيدات الحياة بسهولة، بس هادا مستحيل.
+by gpt: يا ريت نقدر نحل كل تعقيدات الحياة بسهولة، بس هادا مستحيل.
+
+english: Guys, guess the shirt size and win it.
+correct: جماعتنا، اعرف نمرة البلوزة واربحها.
+by gpt: يا جماعة، احزروا نمرة البلوزة واربحوها.
+
+english: You know, every time I see someone carrying a big worry, I feel like they are carrying a heavy sack on their shoulder. We need to help each other and lighten the load for one another.
+correct: بتعرف، كل ما بشوف حدا بيحمل هم كبير، بحس إنو حامل شوال تقيل على كتفو. لازم نساعد بعض ونخفف الحمل عن بعض.
+by gpt: بتعرف، كل مرة بشوف حدا شايل هم كبير، بحس كأنه شايل شوال تقيل على كتفه. لازم نساعد بعض ونخفف الحمل عن بعض.
+
+english: I can tell from the way you talk that you are very excited about this new project.
+correct: بقدر أشوف من طريقة حديثك إنك متحمس كتير لهادا المشروع الجديد.
+by gpt: بقدر أعرف من طريقة حكيك إنك متحمس كتير لهاد المشروع الجديد.
+
+english: I want to tell him that I love him, but I'm afraid that he doesn't love me at all.
+correct: بدي أحكيله إني بحبه، بس خايفة إنه ما بيحبني بالمرة.
+by gpt: بدي أحكيله إني بحبه، بس خايفة إنه ما بيحبني بالمرة.
+
+english: The mechanic that my brother works for says he has never seen someone like him who understands car repair.
+correct: المعلم إلي بيشتغل عنده أخوي بيقول إنه ما شاف واحد متله بيفهم في تصليح السيارات.
+by gpt: الميكانيكي اللي أخوي بيشتغل عنده بيقول إنه عمره ما شاف حدا متله بيفهم بتصليح السيارات.
+
+english: The boy was so smart that he solved the complex mathematical problem without any help.
+correct: كان الولد ها القدة ذكي إنه حل المسألة الرياضية المعقدة بدون مساعدة.
+by gpt: كان الولد ذكي لهالدرجة إنه حل المسألة الرياضية المعقدة بدون أي مساعدة.
+
+english: My father taught me that honest work is more important than money.
+correct: أبوي علمني إنه الشغل الشريف أهم من المصاري.
+by gpt: أبوي علّمني إنه الشغل الشريف أهم من المصاري.
+
+english: If you don't have a permit, you can't set foot in this area, and that makes life very difficult.
+correct: إذا ما معك تسريح، ما بتقدر تحط إجرك في المنطقة هادي، وهادا بخلي الحياة صعبة كتير.
+by gpt: إذا ما معك تصريح، ما بتقدر تحط إجرك بالمنطقة هاي، وهاد بخلي الحياة صعبة كتير.
+
+english: I can make a tasty dressing for the salad using yogurt and herbs.
+correct: بقدر أعمل صلصة طيبة للسلطة باستخدام الروب والأعشاب.
+by gpt: بقدر أعمل تتبيلة زاكية للسلطة باللبن والأعشاب.
+
+english: This boy doesn't stop sniffling, we need to take him to the doctor.
+correct: هادا الولد ما ببطل ينشق، لازم نوخده عالدكتور.
+by gpt: هادا الولد ما ببطل ينشق، لازم نوخده عالدكتور.
+
+english: I will take seats in business class, right?
+correct: رح أخد كراسي بدرجة رجال الأعمال، صح؟
+by gpt: رح أخد كراسي بدرجة رجال الأعمال، صح؟
+
+english: Is there a restaurant you recommend near here?
+correct: في مطعم بتنصح فيه قريب من هون؟
+by gpt: في مطعم بتنصح فيه قريب من هون؟
+
+english: Congratulations on the new job! It will be an excellent position for you.
+correct: مبروك على الوظيفة الجديدة! رح تكون شغلة ممتازة إلك.
+by gpt: مبروك على الوظيفة الجديدة! رح تكون وظيفة ممتازة إلك.
+
+english: I wish I could go back to the day I decided to leave university, I want to change my decision.
+correct: يا ريت بقدر أرجع ع يومها اللي قررت فيه أترك الجامعة، بدي أغير قراري.
+by gpt: يا ريت أقدر أرجع لليوم اللي قررت فيه أترك الجامعة، بدي أغير قراري.
+
+english: As he grew older, my father began to remember more memories from his childhood.
+correct: على كبر، صار أبوي يتذكر أكتر الذكريات من طفولته.
+by gpt: لما كبر، صار أبوي يتذكر ذكريات أكتر من طفولته.
+
+english: Do you want to bet with me that our team will win this game?
+correct: بدك تتراهن معي إنه فريقنا رح يفوز بالمباراة هاي؟
+by gpt: بدك تتراهن معي إنه فريقنا رح يفوز بالمباراة هاي؟
+
+english: I went to the print shop to print my wedding invitations.
+correct: رحت على المطبعة عشان أطبع كرتات الدعوة تبع عرسي.
+by gpt: رحت على المطبعة عشان أطبع كرتات الدعوة تبع عرسي.
+
+english: I always have nightmares at night.
+correct: ‏دايما عندي كوابيس بالليل ‎
+by gpt: دايماً عندي كوابيس بالليل
+
+english: I can work in this factory, but I need to learn some new skills.
+correct: بقدر أشتغل في المصنع هادا بس لازم أتعلم شوية مهارات جديدة.
+by gpt: بقدر أشتغل بهالمصنع، بس لازم أتعلم شوية مهارات جديدة.
+
+english: I heard that the new employee complained about us to the management because we didn't welcome him nicely.
+correct: سمعت إنه الموظف الجديد شكى علينا للإدارة عشان ما استقبلناه منيح.
+by gpt: سمعت إنه الموظف الجديد شكى علينا للإدارة عشان ما استقبلناه منيح.
+
+english: Every time I see an accident on the road, I remember how important it is to be cautious while driving.
+correct: كل ما بشوف حادث عالطريق، بتذكر قديش لازم نكون حذرين وقت السياقة.
+by gpt: كل ما بشوف حادث عالطريق، بتذكر قديش مهم نكون حذرين وإحنا بنسوق.
+
+english: Yesterday, I saw three bats hanging from the tree; I was very scared, but they were beautiful.
+correct: إمبارح شفت تلتة وطوط معلقين عالشجرة، خفت كتير بس كانوا حلوين.
+by gpt: إمبارح شفت تلات وطاويط معلقين عالشجرة؛ خفت كتير، بس كانوا حلوين.
+
+english: I see that you are hesitant in making the decision. What is the reason? Can I help you?
+correct: بشوفك متردد في اتخاذ القرار. شو السبب؟ بقدر أساعدك؟
+by gpt: بشوفك متردد باتخاذ القرار. شو السبب؟ بقدر أساعدك؟
+
+english: She needs to buy new tights because they tore while she was supporting her family.
+correct: بدها تشتري كولون جديد لأنه تمزع لما كانت تعيش عيلتها.
+by gpt: بدها تشتري كولون جديد لأنه تمزّع لما كانت بتعيّش عيلتها.
+
+english: I work at a big company, and every day I go to work by bus.
+correct: أنا بشتغل في شركة كبيرة، وكل يوم بروح ع الشغل بالباص.
+by gpt: أنا بشتغل بشركة كبيرة، وكل يوم بروح عالشغل بالباص.
+
+english: When the wind whistles at night, it scares the children and they start crying.
+correct: لما بتصفر الريح بالليل، بتخوف الأطفال وبصيروا يبكوا.
+by gpt: لما بتصفر الريح بالليل، بتخوف الأطفال وبصيروا يبكوا.
+
+english: Grandma, I want to ask you an embarrassing question.
+correct: يا حاجة بدي اسألك سؤال محرج
+by gpt: ستي، بدي أسألك سؤال محرج.
+
+english: From my perspective, education in particular is the way to self-improvement and societal development.
+correct: من وجهة نظري، التعليم بالذات هو الطريق لتحسين الذات وتطوير المجتمع.
+by gpt: من وجهة نظري، التعليم بالذات هو الطريق لتحسين الذات وتطوير المجتمع.
+
+english: Why do you always come back empty-handed from work? Is there nothing new?
+correct: ليش دايما بترجع تيتي تيتي من الشغل؟ ما في شي جديد؟
+by gpt: ليش دايمًا بترجع تيتي تيتي من الشغل؟ ما في إشي جديد؟
+
+english: Butterflies are very light and move their wings quickly, making me marvel at the beauty of nature.
+correct: الفراشات بتكون خفيفة كتير وبتحرك جناحاتها بسرعة، بتخليني أتأمل في جمال الطبيعة.
+by gpt: الفراشات خفيفة كتير وبتحرك جناحاتها بسرعة، وبتخليني أتأمل بجمال الطبيعة.
+
+english: Do you know that the contract we signed a year ago is still valid until now? We need to see if we want to renew it.
+correct: بتعرف إنه العقد إلي وقعناه قبل سنة لسا ساري لحد الآن؟ لازم نشوف إذا بدنا نجدده.
+by gpt: بتعرف إنه العقد اللي وقعناه قبل سنة لسا ساري لحد هلأ؟ لازم نشوف إذا بدنا نجدده.
+
+english: The sun makes the sky look yellow at sunset, and this view makes me feel at ease.
+correct: الشمس بتخلي السما تبدو صفرا وقت الغروب، وهادا المنظر بخليني أشعر بالراحة.
+by gpt: الشمس بتخلي السما تبين صفرا وقت الغروب، وهاد المنظر بخليني أحس بالراحة.
+
+english: It's not always the person who looks stronger who wins; sometimes intelligence is stronger than physical strength.
+correct: مش دايما الشخص إلي بشكل أقوى هو إلي بيغلب، أحيانا الذكاء بيكون هقوى من القوة الجسمانية.
+by gpt: مش دايمًا الشخص اللي ببيّن أقوى هو اللي بغلب؛ أحيانًا الذكا أقوى من القوة الجسدية.
+
+english: I can understand why people are afraid of the word 'cancer', but we need to remember that there are many success stories.
+correct: بقدر أفهم ليش الناس بخافوا من كلمة 'سرطان'، بس لازم نتذكر إنه في كتير قصص نجاح.
+by gpt: بقدر أفهم ليش الناس بخافوا من كلمة "سرطان"، بس لازم نتذكر إنه في كتير قصص نجاح.
+
+english: I can stick the pictures on the wall with special glue, but I need to be careful not to ruin the paint.
+correct: بقدر أغري الصور على الحيط بغرا خاص، بس لازم أكون حذر عشان ما أخرب الدهان.
+by gpt: بقدر ألزق الصور عالحيط بغرا خاص، بس لازم أنتبه عشان ما أخرب الدهان.
+
+english: We must remain cautious when using electrical appliances, especially if there are children in the house.
+correct: لازم نضل حذرين لما بنستعمل الأدوات الكهربائية، خاصة إذا كان في أطفال في البيت.
+by gpt: لازم نضل ديرين بالنا لما نستعمل الأجهزة الكهربائية، خصوصاً إذا في أطفال بالبيت.
+
+english: I can scare away the pigeons with a special whistle so they fly off and scatter.
+correct: بقدر أفعط الحمام بصفير خاص عشان يطيروا ويتفرقوا.
+by gpt: بقدر أفعط الحمام بصفير خاص عشان يطيروا ويتفرقوا.
+
+english: I know that tea needs time to brew, but I'm really thirsty and can't wait.
+correct: بعرف إنه الشاي بده وقت تا يدبغ، بس أنا عطشان كتير وما بقدر أستنى.
+by gpt: بعرف إنه الشاي بده وقت تا يدبغ، بس أنا عطشان كتير وما بقدر أستنى.
+
+english: When I asked him about the project, he started talking nonsense and I couldn't understand anything from him.
+correct: لما سألته عن المشروع، بلش يخبص بالحكي وما فهمت عليه شي.
+by gpt: لما سألته عن المشروع، بلّش يخبّص بالحكي وما فهمت عليه إشي.
+
+english: Registration for the conference is every day except Saturday, but you should come early so you don't have to wait long.
+correct: التسجيل للمؤتمر بكون كل يوم ما عدا يوم السبت، بس لازم تيجي بكير عشان ما تستنى كتير.
+by gpt: التسجيل للمؤتمر بكون كل يوم ما عدا السبت، بس لازم تيجي بكير عشان ما تستنى كتير.
+
+english: I used to be shy to talk to the girl I love, but finally I got the courage and talked to her.
+correct: كنت باستحي أحكي مع البنت إلي بحبها، بس آخر شي تشجعت وحكيت معها.
+by gpt: كنت باستحي أحكي مع البنت اللي بحبها، بس بالآخر تشجعت وحكيت معها.
+
+english: There is a flower shop across from the hospital, and this is very convenient when I want to bring flowers to someone who is sick.
+correct: في محل بيع ورود قبال المستشفى، وهادا مريح كتير لما بدي أجيب وردات لحدا مريض.
+by gpt: في محل ورد قبال المستشفى، وهاد مريح كتير لما بدي أجيب ورد لحدا مريض.
+
+english: I was happy, I took it, I found the watch.
+correct: فرحت اخدتها, لقيت هالساعة
+by gpt: فرحت، أخدتها، لقيت الساعة.
+
+english: We need to consult a fertility specialist if we want to understand why we can't have children.
+correct: لازم نراجع أخصائي في الخصوبة إذا بدنا نفهم ليش ما عم نقدر نخلف.
+by gpt: لازم نراجع أخصائي خصوبة إذا بدنا نفهم ليش مش قادرين نخلف.
+
+english: When the boy uttered an inappropriate word, his mother got angry at him and told him not to repeat it.
+correct: لما الولد لفظ كلمة مش مناسبة، إمه عصبت عليه وقالتله ما يعيدها.
+by gpt: لما الولد لفظ كلمة مش مناسبة، إمه عصبت عليه وقالتله ما يعيدها.
+
+english: You know? I'm against the idea that life always has to be easy. Difficulties make us stronger.
+correct: بتعرف؟ أنا ضد فكرة إنه الحياة لازم تكون سهلة دايما، الصعوبات بتخلينا أقوى.
+by gpt: بتعرف؟ أنا ضد فكرة إنه الحياة لازم تكون سهلة دايمًا. الصعوبات بتخلّينا أقوى.
+
+english: Muhammad is the messenger of God, and we consider him a role model in our daily lives.
+correct: محمد رسول الله، وبنعتبرو قدوة لإلنا في حياتنا اليومية.
+by gpt: محمد رسول الله، وبنعتبره قدوة إلنا بحياتنا اليومية.
+
+english: I heard that his health condition got worse after he left the hospital.
+correct: سمعت إنه حالته الصحية صارت أعطل بعد ما طلع من المستشفى.
+by gpt: سمعت إنه حالته الصحية صارت أسوأ بعد ما طلع من المستشفى.
+
+english: If you want to hear the new news, come to our house after dinner.
+correct: إذا بدك تسمع الخبر الجديد، تع على بيتنا بعد العشا.
+by gpt: إذا بدك تسمع الأخبار الجديدة، تعال عبيتنا بعد العشا.
+
+english: I wish everyone understood that the struggle against ignorance is the foundation of progress in any society.
+correct: يا ريت كل الناس بتفهم إنه الكفاح ضد الجهل هو أساس التقدم في أي مجتمع.
+by gpt: يا ريت كل الناس تفهم إنه الكفاح ضد الجهل هو أساس التقدّم بأي مجتمع.
+
+english: I can travel anywhere in the world, but I can't find another homeland to replace my original one.
+correct: بقدر أسافر لأي مكان بالعالم، بس ما بقدر ألاقي وطن تاني يحل محل وطني الأصلي.
+by gpt: بقدر أسافر لأي مكان بالعالم، بس ما بقدر ألاقي وطن تاني يحل محل وطني الأصلي.
+
+english: The university wants to update its information system to make it easier for students.
+correct: الجامعة بدها تحدث نظام المعلومات تبعها عشان يصير أسهل للطلاب.
+by gpt: الجامعة بدها تحدّث نظام المعلومات تبعها عشان يصير أسهل للطلاب.
+
+english: My friend can't handle the pressure, he wants to resign from his job.
+correct: صاحبي مش قد الضغط، بده يستقيل من شغله.
+by gpt: صاحبي مش قد الضغط، بده يستقيل من شغله.
+
+english: I asked the pharmacist about the best cream for dry skin, and he recommended a new product that isn't expensive.
+correct: سألت الصيدلي عن أحسن كريم للبشرة الجافة، وهو اقترح علي منتج جديد مش غالي.
+by gpt: سألت الصيدلاني عن أحسن كريم للبشرة الناشفة، ونصحني بمنتج جديد مش غالي.
+
+english: When you see someone raise an eyebrow, it means they are surprised or don't believe it.
+correct: لما بتشوف واحد برفع حاجبه، هادا بيعني إنه مستغرب ولا مش مصدق.
+by gpt: لما بتشوف حدا رافع حاجبه، يعني هو مستغرب أو مش مصدّق.
+
+english: I don't understand how you work without thinking like that, you need to concentrate a bit so you don't make mistakes.
+correct: أنا مش فاهم كيف بتشتغل بلا عقل هيك، لازم تركز شوي عشان ما توقع بأخطاء.
+by gpt: أنا مش فاهم كيف بتشتغل من غير ما تفكر هيك، لازم تركز شوي عشان ما تغلط.
+
+english: There was an open and honest discussion.
+correct: صار في نقاش صريح ‎
+by gpt: صار في نقاش مفتوح وصريح.
+
+english: When the temperature is high, we have to set the air conditioner to a low level.
+correct: لما بتكون الحرارة عالية، بنضطر نحط المكيف على درجة منخفضة.
+by gpt: لما بتكون الحرارة عالية، بنضطر نحط المكيف على درجة منخفضة.
+
+english: If I had the ability to go back in time, I would change a lot of decisions.
+correct: لون عندي القدرة إني أرجع بالزمن، كنت بغير كتير قرارات.
+by gpt: لو عندي القدرة أرجع بالزمن، كنت بغيّر كتير قرارات.
+
+english: When I saw the rope hanging from the tree, the idea came to me to make a swing for the children.
+correct: لما شفت الحبل معلق من الشجرة، إجتني فكرة إنه نعمل أرجوحة للأولاد.
+by gpt: لما شفت الحبل معلّق من الشجرة، إجتني فكرة أعمل مرجيحة للولاد.
+
+english: Donkeys are very common in villages; they use them for transportation and work in agricultural fields.
+correct: الحمير بتلاقيها كتير في القرى، بستعملوها للنقل والشغل في الأراضي الزراعية.
+by gpt: الحمير منتشرة كتير بالقرى؛ بستعملوها للنقل والشغل بالحقول الزراعية.
+
+english: Yesterday in the lecture, the professor was angry because he saw a student asleep in class.
+correct: إمبارح بالمحاضرة، الأستاذ كان معصب لأنه شاف طالب غافي بالصف.
+by gpt: إمبارح بالمحاضرة، الأستاذ كان معصّب لأنه شاف طالب غافي بالصف.
+
+english: The kids like to play in the caves, but we need to warn them of the danger.
+correct: الأولاد بحبو يلعبو في المغر، بس لازم نحذرهم من الخطر.
+by gpt: الأولاد بحبّوا يلعبوا في المغر، بس لازم نحذّرهم من الخطر.
+
+english: My mom's nickname is 'the compassionate lady' because she always takes care of us and helps us with everything.
+correct: لبق أمي 'الست الحنونة' لأنها دايما بتهتم فينا وبتساعدنا بكل إشي.
+by gpt: لقب أمي "الست الحنونة" لأنها دايمًا بتهتم فينا وبتساعدنا بكل إشي.
+
+english: I want to liberate every inch of our occupied land, no matter the sacrifices.
+correct: بدي أحرر كل شبر من أرضنا المحتلة، مهما كانت التضحيات.
+by gpt: بدي أحرر كل شبر من أرضنا المحتلة، مهما كانت التضحيات.
+
+english: The diligent student studies every day to succeed in exams.
+correct: الطالبة الشاطرة بتدرس كل يوم لحتى تنجح في الامتحانات.
+by gpt: الطالب المجتهد بدرس كل يوم عشان ينجح بالامتحانات.
+
+english: In our school, every week we choose a new proverb and discuss it with the students to teach them about culture and popular wisdom.
+correct: في مدرستنا، كل أسبوع بنختار متل جديد وبنناقشه مع الطلاب لنعلمهم عن الثقافة والحكمة الشعبية.
+by gpt: في مدرستنا، كل أسبوع بنختار مَثَل جديد وبنناقشه مع الطلاب عشان نعلّمهم عن الثقافة والحكمة الشعبية.
+
+english: We read the story of Jesus' ascension in the church during Ascension Day and reflect on its meaning.
+correct: بنقرا قصة صعود يسوع في الكنيسة خلال عيد الصعود، وبنتأمل في معناها.
+by gpt: بنقرا قصة صعود يسوع في الكنيسة خلال عيد الصعود، وبنتأمل في معناها.
+
+english: They say that the weaver can create complex designs, but I think that modern machines do a better and faster job.
+correct: بقولوا إنه الحايك بقدر يعمل تصاميم معقدة، بس أنا بشوف إنه الآلات الحديثة بتعمل شغل أحسن وأسرع.
+by gpt: بقولوا إنه الحايك بقدر يعمل تصاميم معقدة، بس أنا بشوف إنه الماكينات الحديثة بتعمل الشغل أحسن وأسرع.
+
+english: When you see the achievements of your country, you can feel real pride and strong belonging.
+correct: لما بتشوف إنجازات بلدك، بتقدر تشعر بافتخار حقيقي وإنتماء قوي.
+by gpt: لما بتشوف إنجازات بلدك، بتحس بفخر حقيقي وانتماء قوي.
+
+english: According to people's belief, this winter will be stronger than last year.
+correct: حسب اعتقاد الناس، الشتا هالسنة رح يكون أقوى من السنة الماضية.
+by gpt: حسب اعتقاد الناس، الشتا هالسنة رح يكون أقوى من السنة الماضية.
+
+english: Children love to hide in closets, but we need to explain to them that it is dangerous.
+correct: الأطفال بحبوا يستخبوا في الخزاين، بس لازم نوعيهم إنه هادا خطير.
+by gpt: الأطفال بحبّوا يستخبّوا بالخزاين، بس لازم نشرحلهم إنه هادا خطر.
+
+english: You can see that children find it easy to handle new technology.
+correct: بتقدر تشوف إنه الأطفال هوينين في التعامل مع التكنولوجيا الجديدة.
+by gpt: بتقدر تشوف إنو الأطفال بسهل عليهم يتعاملوا مع التكنولوجيا الجديدة.
+
+english: I saw a big white sheep in my grandfather's barn yesterday.
+correct: شفت نعجة بيضا كبيرة في حظيرة جدي إمبارح.
+by gpt: شفت نعجة بيضا كبيرة بحظيرة جدي إمبارح.
+
+english: They say that the students have to wear uniforms, but I don’t like it.
+correct: بقولوا إنه الطلاب لازم يلبسوا اللباس الموحد بس أنا ما بحبه.
+by gpt: بقولوا إنه الطلاب لازم يلبسوا زي موحد، بس أنا ما بحبه.
+
+english: When you order something from the internet, you need to pay attention to the size of the package so you don't pay extra for shipping.
+correct: لما بتطلب إشي من الإنترنت، لازم تنتبه على حجم الطرد عشان ما تدفع زيادة عالشحن.
+by gpt: لما بتطلب إشي من الإنترنت، لازم تنتبه لحجم الطرد عشان ما تدفع زيادة على الشحن.
+
+english: I have a big mole on my back, and I love it a lot because it's unique.
+correct: عندي شامة كبيرة على ضهري، وبحبها كتير لأنها مميزة.
+by gpt: عندي شامة كبيرة على ضهري، وبحبها كتير لأنها مميزة.
+
+english: Did you see that man? He was carrying a big box and walking down the street as if there was nothing.
+correct: شفت هداك الزلمة؟ كان حامل سحارة كبيرة وماشي في الشارع كأنه ما في إشي.
+by gpt: شفت هداك الزلمة؟ كان حامل صندوق كبير وماشي بالشارع كأنه ما في إشي.
+
+english: Man, don't scratch the wound like that, it will get worse and you'll end up with a scar.
+correct: يا زلمة، ما تحكش الجرح هيك، راح يصير أسوأ وبتصير عندك ندبة.
+by gpt: يا زلمة، ما تحكّش الجرح هيك، رح يصير أسوأ وبتصير عندك ندبة.
+
+english: I want to buy new sheep shears because the old ones don't cut well anymore.
+correct: بدي أشتري مجز جديد لإنه القديم صار ما بيقطع منيح.
+by gpt: بدي أشتري مجز غنم جديد عشان القديم بطل يقطع منيح.
+
+english: Did you see how the boy dropped to the ground when he heard the sound of the plane?
+correct: شفت الولد كيف زخ على الأرض لـما سمع صوت الطيارة؟
+by gpt: شفت كيف الولد وقع عالأرض لما سمع صوت الطيارة؟
+
+english: Every day my mom wakes me up at six, even though I want to sleep a little longer.
+correct: كل يوم بتصحيني أمي الساعة ستة، مع إنه بكون بدي أنام شوية كمان.
+by gpt: كل يوم أمي بتصحيني عالساعة ستة، مع إني بدي أنام شوي كمان.
+
+english: Every time I hear about an honor killing, I feel very sad and wish there were another way to solve problems.
+correct: كل ما بسمع عن حادثة قتل على شرف العيلة، بحزن كتير وبتمنى لو في طريقة تانية لحل المشاكل.
+by gpt: كل ما بسمع عن جريمة قتل على شرف العيلة، بحزن كتير وبتمنى يكون في طريقة تانية لحل المشاكل.
+
+english: I need to study a lot in order to succeed in the exam.
+correct: بدي أدرس كتير منشان أنجح في الامتحان
+by gpt: بدي أدرس كتير عشان أنجح بالامتحان
+
+english: Oh God, what happened? I heard a loud explosion outside!
+correct: يا ساتر، شو صار؟ سمعت صوت انفجار قوي برا!
+by gpt: يا ساتر، شو صار؟ سمعت صوت انفجار قوي برا!
+
+english: Do what you want, but remember that you have to bear the consequences of your decisions.
+correct: إعمل على خاطرك، بس تذكر إنه لازم تتحمل نتايج قراراتك.
+by gpt: اعمل اللي بدك إياه، بس تذكر إنك لازم تتحمل عواقب قراراتك.
+
+english: They say the similarity between a husband and wife increases over time, and this is what I see with my grandparents.
+correct: بقولوا إنه التشابه  بين الزوج والزوجة بزيد مع الوقت، وهادا إلي بشوفه عند ستي وسيدي.
+by gpt: بقولوا إنه التشابه بين الزوج والزوجة بزيد مع الوقت، وهادا اللي بشوفه عند ستي وسيدي.
+
+english: They set the dogs on me when I entered the house, it was very scary but then it turned out they were friendly.
+correct: وزوا الكلاب علي لما دخلت الدار، كانت مخيفة كتير بس بعدين طلعوا ودودين.
+by gpt: وزّوا الكلاب عليّ لما دخلت الدار، كان الإشي بخوّف كتير بس بعدين طلعوا ودودين.
+
+english: No, nothing.. Come on, let's go to school, we're very late.
+correct: لا, ما في شي.. يلا نروح على المدرسة, تأخّرنا كتير
+by gpt: لا، ما في شي.. يلا نروح على المدرسة، تأخرنا كتير.
+
+english: The kids love to play tag in the yard, they run and laugh all the time.
+correct: الأولاد بيحبوا يلعبوا زقيطة في الساحة، بيركضوا وبيضحكوا طول الوقت.
+by gpt: الأولاد بيحبّوا يلعبوا زقيطة بالحوش، بيركضوا وبيضحكوا طول الوقت.
+
+english: If you keep being this grumpy, you'll ruin your life and the lives of those around you.
+correct: إذا ظليت نكد هيك، رح تنكد حياتك وحياة اللي حواليك.
+by gpt: إذا ضليت نكدي هيك، رح تخرب حياتك وحياة اللي حواليك.
+
+english: They say that the new law that was going to cancel the subsidy on gasoline was canceled after public protests.
+correct: بقولوا إنه القانون الجديد اللي كان رح يلغي الدعم على البنزين التغى بعد احتجاجات الشعب.
+by gpt: بقولوا إنه القانون الجديد اللي كان رح يلغي الدعم على البنزين انلغى بعد احتجاجات شعبية.
+
+english: I think the company is creating a cold atmosphere among the employees, there is no cooperation or communication between them.
+correct: أظن إنه الشركة عاملة جو بارد بين الموظفين، ما في تعاون ولا تواصل بيناتهم.
+by gpt: أظن إنه الشركة عاملة جو بارد بين الموظفين، ما في تعاون ولا تواصل بينهم.
+
+english: Rebuilding trust after betrayal is not easy, it requires patience, time, and effort from both sides.
+correct: إعادة بناء الثقة بعد الخيانة مش سهلة، بدها صبر ووقت وجهود من الطرفين.
+by gpt: إعادة بناء الثقة بعد الخيانة مش سهلة، بدها صبر ووقت وجهد من الطرفين.
+
+english: Exams are tiring for the mind and body, but we must endure them patiently.
+correct: الإمتحانات متعبة للعقل والجسم، بس لازم نصبر عليها.
+by gpt: الإمتحانات متعبة للعقل والجسم، بس لازم نصبر عليها بصبر.
+
+english: I think grape picking requires experience and skill. It's not just picking and done, you need to know when the grapes are ripe and ready.
+correct: أظن إنه قطف العنب بحتاج خبرة ومهارة. مش بس بتقطف وخلص، لازم تعرف إمتى العنب ناضج وجاهز.
+by gpt: بفكر إن قطف العنب بده خبرة ومهارة. مش بس بتقطف وخلص، لازم تعرف إمتى العنب استوى وصار جاهز.
+
+english: I wish you would explain to me how this new machine works, I don't know what to do with it.
+correct: يا ريت تفهمني كيف بتشتغل هالآلة الجديدة، مش عارف شو أعمل فيها.
+by gpt: يا ريت تفهمني كيف بتشتغل هالآلة الجديدة، مش عارف شو أعمل فيها.
+
+english: My voice is hoarse from yelling too much in the game yesterday.
+correct: صوتي مبحوح من كتر الصياح في المباراة إمبارح
+by gpt: صوتي مبحوح من كتر الصراخ بالمباراة إمبارح.

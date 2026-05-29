@@ -20,6 +20,9 @@ type MasteryCelebration = {
   text: string;
   direction: ReviewDirection;
 };
+type StartupError = {
+  message: string;
+};
 const AUTO_SPEAK_HEBREW_STORAGE_KEY = "oolpan_auto_speak_hebrew_flashcards";
 const AUTO_SPEAK_DELAY_MS = 500;
 const TRANSLATION_DEBOUNCE_MS = 700;
@@ -164,6 +167,7 @@ export default function App() {
   const uiLanguage: AppLanguage = "en";
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [startupError, setStartupError] = useState<StartupError | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [authUsername, setAuthUsername] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -438,7 +442,9 @@ export default function App() {
             return;
           }
 
-          pushToast(requestError instanceof Error ? requestError.message : "Unknown error", "error");
+          setStartupError({
+            message: requestError instanceof Error ? requestError.message : "Unknown error"
+          });
         }
       })
       .catch((requestError: unknown) => {
@@ -452,7 +458,9 @@ export default function App() {
           return;
         }
 
-        pushToast(requestError instanceof Error ? requestError.message : "Unknown error", "error");
+        setStartupError({
+          message: requestError instanceof Error ? requestError.message : "Unknown error"
+        });
       })
       .finally(() => {
         if (!isCancelled) {
@@ -1012,6 +1020,31 @@ export default function App() {
         <main className="auth-shell">
           <section className="panel auth-panel auth-panel-loading">
             <span className="button-spinner" aria-hidden="true" />
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (startupError) {
+    return (
+      <div className="app-shell" dir={appDirection}>
+        <div className="background-glow glow-one" />
+        <div className="background-glow glow-two" />
+        <div className="background-glow glow-three" />
+        <main className="auth-shell">
+          <section className="panel auth-panel app-error-panel">
+            <img className="brand-logo auth-logo" src="/oolpan-logo.png" alt="Oolpan" />
+            <h1>Something went wrong</h1>
+            <p className="auth-password-warning">
+              The app could not finish loading. This is usually temporary.
+            </p>
+            <p className="app-error-detail">{startupError.message}</p>
+            <button className="primary-button auth-inline-button" type="button" onClick={() => window.location.reload()}>
+              <span className="button-content">
+                <span>Reload</span>
+              </span>
+            </button>
           </section>
         </main>
       </div>

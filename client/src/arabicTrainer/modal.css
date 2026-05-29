@@ -1,0 +1,114 @@
+.arabic-trainer-root .modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 20;
+  padding: 18px;
+  background: rgba(20, 22, 25, 0.48);
+}
+
+.arabic-trainer-root .letter-modal {
+  display: grid;
+  width: min(980px, 100%);
+  max-height: min(760px, calc(100vh - 36px));
+  gap: 14px;
+  overflow: hidden;
+  border: 1px solid #d9d1c4;
+  background: #fffaf2;
+  padding: 18px;
+  box-shadow: 0 24px 70px rgba(22, 20, 18, 0.28);
+}
+
+.arabic-trainer-root .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.arabic-trainer-root .modal-header h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+.arabic-trainer-root .modal-subtitle {
+  margin: 2px 0 0;
+  color: #68635b;
+  font-weight: 700;
+}
+
+.arabic-trainer-root .icon-button {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid #cbbfaf;
+  background: #f6efe3;
+  color: #17191d;
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.arabic-trainer-root .form-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.arabic-trainer-root .form-tab {
+  min-height: 42px;
+  border: 1px solid #cbbfaf;
+  background: #f6efe3;
+  color: #34302b;
+  font-weight: 800;
+}
+
+.arabic-trainer-root .form-tab.active {
+  border-color: #226574;
+  background: #226574;
+  color: #fff;
+}
+
+.arabic-trainer-root .letter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.arabic-trainer-root .letter-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  border: 1px solid #ded5c8;
+  background: #fbf6ec;
+  padding: 8px 10px;
+}
+
+.arabic-trainer-root .chart-arabic {
+  color: #17252b;
+  font-size: 2.2rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.arabic-trainer-root .chart-english {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.arabic-trainer-root .chart-english strong {
+  color: #b33f32;
+  font-size: 1.12rem;
+  line-height: 1.1;
+}
+
+.arabic-trainer-root .chart-english span {
+  color: #68635b;
+  font-size: 0.84rem;
+}

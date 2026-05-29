@@ -1,7 +1,6 @@
 import cors from "cors";
 import express, { type Express } from "express";
 import { appConfig } from "./config.js";
-import { initializeSchema } from "./db/schema.js";
 import { apiRouter } from "./routes/api.js";
 
 let appPromise: Promise<Express> | null = null;
@@ -16,7 +15,6 @@ function isLocalDevOrigin(origin: string) {
 }
 
 async function buildApp() {
-  await initializeSchema();
   const app = express();
 
   app.use(

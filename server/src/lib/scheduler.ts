@@ -6,6 +6,8 @@ export const DEFAULT_ADAPTIVE_INITIAL_TRIALS = 3;
 const SCORE_DECAY_FACTOR = 0.8;
 const MIN_SCORE = 0.02;
 const MAX_SCORE = 0.98;
+const SCORE_SAMPLING_EXPONENT = 1.7;
+const SCORE_SAMPLING_MULTIPLIER = 2;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -87,7 +89,12 @@ export function computeSamplingWeight(progress: ReviewProgress, now = new Date()
   const ageBoost = Number.isFinite(recencyMinutes)
     ? clamp(1 + recencyMinutes / (60 * 24), 1, 2.4)
     : 1.3;
-  const masteryNeed = clamp(1.15 - progress.weight, 0.08, 1.2);
+  const masteryGap = clamp(1 - progress.weight, 0.04, 1);
+  const masteryNeed = clamp(
+    Math.pow(masteryGap, SCORE_SAMPLING_EXPONENT) * SCORE_SAMPLING_MULTIPLIER,
+    0.08,
+    2.4
+  );
 
   let recencyPenalty = 1;
   if (recencyMinutes < 1) {

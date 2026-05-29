@@ -263,6 +263,23 @@ textarea {
   place-items: center;
 }
 
+.app-error-panel {
+  justify-items: center;
+  text-align: center;
+}
+
+.app-error-detail {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 238, 242, 0.72);
+  color: #8b2c4a;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .auth-logo {
   width: min(48vw, 190px);
 }
@@ -658,6 +675,10 @@ textarea {
   height: 16px;
   accent-color: #8d6ae0;
   margin: 0;
+}
+
+.auto-speak-toggle-mobile {
+  display: none;
 }
 
 .section-row {
@@ -1711,13 +1732,18 @@ textarea {
     gap: 10px;
   }
 
+  .translator-panel > h2,
   .study-panel-header {
-    align-items: start;
+    display: none;
   }
 
-  .auto-speak-toggle {
-    max-width: 46%;
+  .auto-speak-toggle-mobile {
+    display: inline-flex;
+    justify-content: flex-start;
+    max-width: none;
+    margin: 8px 2px 0;
     line-height: 1.25;
+    text-align: left;
   }
 
   .learned-counter,
