@@ -252,7 +252,16 @@ async function getPluralTransliterations(
 }
 
 export async function createFlashcardWithImage(userId: number, input: CreateFlashcardRequest) {
-  const normalizedInput = await addNikudToFlashcardInput(input);
+  const complementExpandedInput = await aiClient.expandVerbComplement(input);
+  const normalizedInput = await addNikudToFlashcardInput({
+    ...input,
+    sourceText: complementExpandedInput.sourceText,
+    targetText: complementExpandedInput.targetText,
+    sourcePluralText: null,
+    targetPluralText: null,
+    sourcePluralTransliteration: null,
+    targetPluralTransliteration: null
+  });
   const existing = await findFlashcardByPhrase(userId, normalizedInput);
   if (existing?.imageData && existing.isActive && hasRequiredHebrewTransliteration(existing)) {
     return {

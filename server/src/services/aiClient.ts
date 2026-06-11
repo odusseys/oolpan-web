@@ -117,6 +117,12 @@ const pluralizationResultSchema = z.object({
   targetPluralText: z.string().min(1).nullable()
 });
 
+const verbComplementResultSchema = z.object({
+  shouldExpand: z.boolean(),
+  sourceText: z.string().min(1),
+  targetText: z.string().min(1)
+});
+
 type FlashcardMeaning = Pick<CreateFlashcardRequest, "sourceText" | "sourceLanguage" | "targetText" | "targetLanguage">;
 type FlashcardPluralization = Pick<CreateFlashcardRequest, "sourcePluralText" | "targetPluralText">;
 
@@ -175,6 +181,31 @@ function normalizeSuggestionText(text: string) {
     .replace(/[^\p{Letter}\p{Number}]+/gu, " ")
     .trim()
     .toLocaleLowerCase();
+}
+
+function getEnglishText(input: FlashcardMeaning) {
+  if (input.sourceLanguage === "en") {
+    return input.sourceText.trim();
+  }
+
+  if (input.targetLanguage === "en") {
+    return input.targetText.trim();
+  }
+
+  return "";
+}
+
+function shouldConsiderVerbComplementExpansion(input: FlashcardMeaning) {
+  const englishText = getEnglishText(input);
+  if (!/^to\s+\p{Letter}/iu.test(englishText)) {
+    return false;
+  }
+
+  if (/\b(someone|somebody|something|somewhere|anyone|anything|anywhere|him|her|them|it|me|us)\b/i.test(englishText)) {
+    return false;
+  }
+
+  return englishText.split(/\s+/).length <= 5;
 }
 
 function endpointUrl(baseUrl: string, path: string) {
@@ -393,6 +424,32 @@ class MockAiClient {
     return {
       sourcePluralText: input.sourceLanguage === "en" ? `${source}s` : `${source}ים`,
       targetPluralText: input.targetLanguage === "en" ? `${target}s` : `${target}ים`
+    };
+  }
+
+  async expandVerbComplement(input: FlashcardMeaning): Promise<FlashcardMeaning> {
+    if (!shouldConsiderVerbComplementExpansion(input)) {
+      return input;
+    }
+
+    const expandEnglish = (text: string) => {
+      const normalized = text.trim().toLocaleLowerCase();
+
+      if (normalized === "to go") {
+        return "to go somewhere";
+      }
+
+      if (normalized === "to insult") {
+        return "to insult someone";
+      }
+
+      return text.trim();
+    };
+
+    return {
+      ...input,
+      sourceText: input.sourceLanguage === "en" ? expandEnglish(input.sourceText) : input.sourceText,
+      targetText: input.targetLanguage === "en" ? expandEnglish(input.targetText) : input.targetText
     };
   }
 
@@ -858,6 +915,72 @@ class OpenAiCompatibleAiClient {
     return {
       sourcePluralText: parsed.sourcePluralText.trim(),
       targetPluralText: parsed.targetPluralText.trim()
+    };
+  }
+
+  async expandVerbComplement(input: FlashcardMeaning): Promise<FlashcardMeaning> {
+    if (!shouldConsiderVerbComplementExpansion(input)) {
+      return input;
+    }
+
+    if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
+      return input;
+    }
+
+    const systemPrompt = [
+      "You normalize bilingual vocabulary flashcards before they are saved.",
+      "Return JSON only with the keys shouldExpand, sourceText, and targetText.",
+      "Only expand when the English side is a bare infinitive verb phrase that is too incomplete for a useful flashcard because it lacks a simple object, person, thing, or place complement.",
+      "When expansion is needed, add exactly one short generic complement to the English phrase, using natural learner-friendly wording.",
+      "Use complements such as someone, something, somewhere, to someone, at something, or with someone only when they are grammatically natural.",
+      "Examples: 'to insult' becomes 'to insult someone'; 'to go' becomes 'to go somewhere'; 'to look at' becomes 'to look at something'.",
+      "If the English phrase is already complete enough, or is not an infinitive verb phrase, set shouldExpand false and return both texts unchanged.",
+      "When you expand one side, update the other language side to mean the same expanded phrase.",
+      "Use everyday conversational wording.",
+      "If the returned Hebrew text includes Hebrew, include nikud.",
+      "Do not explain anything."
+    ].join(" ");
+
+    const userPrompt = [
+      `Source language: ${languageName(input.sourceLanguage)}.`,
+      `Target language: ${languageName(input.targetLanguage)}.`,
+      `Source text: ${input.sourceText.trim()}.`,
+      `Target text: ${input.targetText.trim()}.`
+    ].join("\n");
+
+    const response = await fetch(endpointUrl(appConfig.llmApiBaseUrl, "responses"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${appConfig.llmApiKey}`
+      },
+      body: JSON.stringify({
+        model: miniModel(appConfig.llmModel),
+        reasoning: {
+          effort: "none"
+        },
+        instructions: systemPrompt,
+        input: userPrompt
+      })
+    });
+
+    if (!response.ok) {
+      await throwApiError("Verb complement request", response);
+    }
+
+    const payload = (await response.json()) as unknown;
+    const content = extractResponseOutputText(payload);
+    const parsed = verbComplementResultSchema.parse(extractJsonObject(content));
+
+    if (!parsed.shouldExpand) {
+      return input;
+    }
+
+    return {
+      sourceText: parsed.sourceText.trim(),
+      sourceLanguage: input.sourceLanguage,
+      targetText: parsed.targetText.trim(),
+      targetLanguage: input.targetLanguage
     };
   }
 
