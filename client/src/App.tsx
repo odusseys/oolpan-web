@@ -1,9 +1,17 @@
 import type { AppLanguage, ReviewDirection, StudyCard, SuggestedFlashcard, TranslationResult, User } from "@study/shared";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
+import { RootFinderModal } from "./components/RootFinderModal";
 import { StudyPanel } from "./components/StudyPanel";
 import { TranslatorPanel } from "./components/TranslatorPanel";
 import { api, isUnauthorizedError } from "./lib/api";
 import { t } from "./lib/copy";
+import {
+  createFlashcardRequestFromRootEntry,
+  loadPealimRootGroups,
+  searchPealimRoots,
+  type PealimRootEntry,
+  type PealimRootGroup
+} from "./lib/rootFinder";
 import { clearLegacyMediaLocalStorage } from "./lib/storageCleanup";
 
 type Toast = {
@@ -26,9 +34,17 @@ type StartupError = {
 const AUTO_SPEAK_HEBREW_STORAGE_KEY = "oolpan_auto_speak_hebrew_flashcards";
 const AUTO_SPEAK_DELAY_MS = 500;
 const TRANSLATION_DEBOUNCE_MS = 700;
+const MOBILE_TAB_MEDIA_QUERY = "(max-width: 980px)";
+const MOBILE_TAB_SWIPE_MIN_DISTANCE_PX = 56;
+const MOBILE_TAB_SWIPE_DOMINANCE_RATIO = 1.25;
 const MEDIA_CACHE_NAME = "oolpan-media-v1";
 const MEDIA_CACHE_ROUTE = "/__oolpan_media";
 const MEDIA_CACHE_MAX_ENTRIES = 80;
+type MobileTabSwipeStart = {
+  identifier: number;
+  x: number;
+  y: number;
+};
 type GoogleWindow = Window & {
   google?: {
     accounts?: {
@@ -86,6 +102,39 @@ function isEditableShortcutTarget(target: EventTarget | null) {
 
   const tagName = target.tagName.toLowerCase();
   return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+}
+
+function isMobileTabViewport() {
+  return typeof window !== "undefined" && window.matchMedia(MOBILE_TAB_MEDIA_QUERY).matches;
+}
+
+function findChangedTouch(touches: ReactTouchEvent<HTMLElement>["changedTouches"], identifier: number) {
+  for (let index = 0; index < touches.length; index += 1) {
+    const touch = touches.item(index);
+    if (touch?.identifier === identifier) {
+      return touch;
+    }
+  }
+
+  return null;
+}
+
+function getSwipeTargetTab(currentTab: MobileTab, deltaX: number): MobileTab | null {
+  if (deltaX < 0 && currentTab === "translate") {
+    return "flashcards";
+  }
+
+  if (deltaX > 0 && currentTab === "flashcards") {
+    return "translate";
+  }
+
+  return null;
+}
+
+function isHorizontalTabSwipe(deltaX: number, deltaY: number) {
+  const absoluteX = Math.abs(deltaX);
+  const absoluteY = Math.abs(deltaY);
+  return absoluteX >= MOBILE_TAB_SWIPE_MIN_DISTANCE_PX && absoluteX > absoluteY * MOBILE_TAB_SWIPE_DOMINANCE_RATIO;
 }
 
 function canUseServiceWorkerMediaCache() {
@@ -180,6 +229,13 @@ export default function App() {
   const [isAppMenuOpen, setIsAppMenuOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isRootFinderOpen, setIsRootFinderOpen] = useState(false);
+  const [rootFinderQuery, setRootFinderQuery] = useState("");
+  const [rootFinderGroups, setRootFinderGroups] = useState<PealimRootGroup[] | null>(null);
+  const [isRootFinderLoading, setIsRootFinderLoading] = useState(false);
+  const [rootFinderError, setRootFinderError] = useState<string | null>(null);
+  const [savingRootEntryId, setSavingRootEntryId] = useState<string | null>(null);
+  const [addedRootEntryIds, setAddedRootEntryIds] = useState<Set<string>>(() => new Set());
   const [sourceLanguage, setSourceLanguage] = useState<AppLanguage>("en");
   const [targetLanguage, setTargetLanguage] = useState<AppLanguage>("he");
   const [text, setText] = useState("");
@@ -218,6 +274,7 @@ export default function App() {
   const autoSpeakTimeoutRef = useRef<number | null>(null);
   const liveTranslateTimeoutRef = useRef<number | null>(null);
   const hasSkippedInitialLiveTranslateRef = useRef(false);
+  const mobileTabSwipeStartRef = useRef<MobileTabSwipeStart | null>(null);
   const latestTranslationRequestRef = useRef(0);
   const latestTranslationInputRef = useRef({
     text,
@@ -235,6 +292,10 @@ export default function App() {
   const translationAudioKey = `translator:${translatorSpeechLanguage}:${translatorSpeechText}`;
 
   const appDirection = "ltr";
+  const rootFinderResults = useMemo(
+    () => searchPealimRoots(rootFinderGroups, rootFinderQuery),
+    [rootFinderGroups, rootFinderQuery]
+  );
 
   useEffect(() => {
     clearLegacyMediaLocalStorage();
@@ -284,9 +345,13 @@ export default function App() {
     setSuggestions([]);
     setSuggestionsContextCount(0);
     setAddedSuggestionIds(new Set());
+    setAddedRootEntryIds(new Set());
     setTranslationResult(null);
     setText("");
     setIsSuggestionsOpen(false);
+    setIsRootFinderOpen(false);
+    setRootFinderQuery("");
+    setSavingRootEntryId(null);
     setIsRevealed(false);
     setLoadingAudioKey(null);
   }, []);
@@ -474,19 +539,20 @@ export default function App() {
   }, [clearSession, loadDeckData, pushToast, uiLanguage]);
 
   useEffect(() => {
-    if (!isSuggestionsOpen) {
+    if (!isSuggestionsOpen && !isRootFinderOpen) {
       return;
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsSuggestionsOpen(false);
+        setIsRootFinderOpen(false);
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSuggestionsOpen]);
+  }, [isRootFinderOpen, isSuggestionsOpen]);
 
   useEffect(() => {
     if (!isAppMenuOpen && !isLogoutConfirmOpen && !isHelpOpen) {
@@ -504,6 +570,37 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isAppMenuOpen, isHelpOpen, isLogoutConfirmOpen]);
+
+  useEffect(() => {
+    if (!isRootFinderOpen || rootFinderGroups) {
+      return;
+    }
+
+    let isCancelled = false;
+    setIsRootFinderLoading(true);
+    setRootFinderError(null);
+
+    void loadPealimRootGroups()
+      .then((groups) => {
+        if (!isCancelled) {
+          setRootFinderGroups(groups);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setRootFinderError(t(uiLanguage, "rootFinderLoadError"));
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsRootFinderLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isRootFinderOpen, rootFinderGroups, uiLanguage]);
 
   useEffect(() => {
     window.localStorage.setItem(AUTO_SPEAK_HEBREW_STORAGE_KEY, String(autoSpeakHebrewFlashcards));
@@ -652,6 +749,22 @@ export default function App() {
     }
   }
 
+  async function handleSaveRootFlashcard(entry: PealimRootEntry) {
+    try {
+      setSavingRootEntryId(entry.id);
+      const response = await api.createFlashcard(createFlashcardRequestFromRootEntry(entry));
+      await loadDeckData();
+      setLearnedWords(response.stats.learnedWords);
+      setIsRevealed(false);
+      setAddedRootEntryIds((current) => new Set(current).add(entry.id));
+      pushToast(t(uiLanguage, "rootFinderAdded"), "success");
+    } catch (requestError) {
+      pushToast(requestError instanceof Error ? requestError.message : "Unknown error", "error");
+    } finally {
+      setSavingRootEntryId(null);
+    }
+  }
+
   async function handleReview(result: "oops" | "got_it") {
     if (!currentCard) {
       return;
@@ -708,6 +821,7 @@ export default function App() {
         isLogoutConfirmOpen ||
         isHelpOpen ||
         isSuggestionsOpen ||
+        isRootFinderOpen ||
         isReviewBusy ||
         isRemovingCard
       ) {
@@ -752,6 +866,7 @@ export default function App() {
     isRemovingCard,
     isRevealed,
     isReviewBusy,
+    isRootFinderOpen,
     isSuggestionsOpen,
     mobileTab
   ]);
@@ -759,6 +874,11 @@ export default function App() {
   async function handleOpenSuggestions() {
     setIsSuggestionsOpen(true);
     await loadSuggestions();
+  }
+
+  function handleOpenRootFinder() {
+    setIsAppMenuOpen(false);
+    setIsRootFinderOpen(true);
   }
 
   const handleSpeak = useCallback(
@@ -1007,6 +1127,57 @@ export default function App() {
   function handleInputChange(value: string) {
     setText(value);
   }
+
+  const handleMobileTabTouchStart = useCallback((event: ReactTouchEvent<HTMLElement>) => {
+    if (!isMobileTabViewport() || event.touches.length !== 1) {
+      mobileTabSwipeStartRef.current = null;
+      return;
+    }
+
+    const touch = event.touches.item(0);
+    if (!touch) {
+      mobileTabSwipeStartRef.current = null;
+      return;
+    }
+
+    mobileTabSwipeStartRef.current = {
+      identifier: touch.identifier,
+      x: touch.clientX,
+      y: touch.clientY
+    };
+  }, []);
+
+  const handleMobileTabTouchMove = useCallback((event: ReactTouchEvent<HTMLElement>) => {
+    if (event.touches.length > 1) {
+      mobileTabSwipeStartRef.current = null;
+    }
+  }, []);
+
+  const handleMobileTabTouchEnd = useCallback((event: ReactTouchEvent<HTMLElement>) => {
+    const swipeStart = mobileTabSwipeStartRef.current;
+    mobileTabSwipeStartRef.current = null;
+
+    if (!swipeStart || !isMobileTabViewport()) {
+      return;
+    }
+
+    const touch = findChangedTouch(event.changedTouches, swipeStart.identifier);
+    if (!touch) {
+      return;
+    }
+
+    const deltaX = touch.clientX - swipeStart.x;
+    const deltaY = touch.clientY - swipeStart.y;
+    if (!isHorizontalTabSwipe(deltaX, deltaY)) {
+      return;
+    }
+
+    setMobileTab((currentTab) => getSwipeTargetTab(currentTab, deltaX) ?? currentTab);
+  }, []);
+
+  const handleMobileTabTouchCancel = useCallback(() => {
+    mobileTabSwipeStartRef.current = null;
+  }, []);
 
   if (!isAuthReady) {
     return (
@@ -1317,6 +1488,14 @@ export default function App() {
             </div>
             <div className="app-menu-actions" role="menu">
               <button
+                className="menu-action header-menu-action app-menu-action app-menu-action-neutral"
+                type="button"
+                role="menuitem"
+                onClick={handleOpenRootFinder}
+              >
+                {t(uiLanguage, "rootFinderMenu")}
+              </button>
+              <button
                 className="menu-action header-menu-action app-menu-action"
                 type="button"
                 role="menuitem"
@@ -1434,7 +1613,13 @@ export default function App() {
           </button>
         </div>
 
-        <main className="main-grid">
+        <main
+          className="main-grid"
+          onTouchStart={handleMobileTabTouchStart}
+          onTouchMove={handleMobileTabTouchMove}
+          onTouchEnd={handleMobileTabTouchEnd}
+          onTouchCancel={handleMobileTabTouchCancel}
+        >
           <div className={mobileTab === "translate" ? "panel-wrap active-mobile" : "panel-wrap"}>
             <TranslatorPanel
               uiLanguage={uiLanguage}
@@ -1579,6 +1764,21 @@ export default function App() {
             )}
           </section>
         </div>
+      ) : null}
+
+      {isRootFinderOpen ? (
+        <RootFinderModal
+          uiLanguage={uiLanguage}
+          query={rootFinderQuery}
+          results={rootFinderResults}
+          isLoading={isRootFinderLoading}
+          error={rootFinderError}
+          savingEntryId={savingRootEntryId}
+          addedEntryIds={addedRootEntryIds}
+          onQueryChange={setRootFinderQuery}
+          onAddEntry={(entry) => void handleSaveRootFlashcard(entry)}
+          onClose={() => setIsRootFinderOpen(false)}
+        />
       ) : null}
     </div>
   );

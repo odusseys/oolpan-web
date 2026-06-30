@@ -6,7 +6,7 @@ export const reviewResults = ["oops", "got_it"] as const;
 export type ReviewResult = (typeof reviewResults)[number];
 export const reviewDirections = ["source_to_target", "target_to_source"] as const;
 export type ReviewDirection = (typeof reviewDirections)[number];
-export const LEARNED_SCORE_THRESHOLD = 0.8;
+export const LEARNED_SCORE_THRESHOLD = 0.9;
 
 export const partOfSpeechOptions = ["noun", "verb", "adjective", "phrase", "other"] as const;
 export type PartOfSpeech = (typeof partOfSpeechOptions)[number];

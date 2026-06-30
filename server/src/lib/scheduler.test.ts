@@ -1,6 +1,6 @@
 import type { FlashcardRecord } from "@study/shared";
 import { describe, expect, it } from "vitest";
-import { applyReviewOutcome, computeSamplingWeight } from "./scheduler.js";
+import { DEFAULT_ADAPTIVE_LEARNING_SCORE, applyReviewOutcome, computeSamplingWeight } from "./scheduler.js";
 
 function makeCard(overrides: Partial<FlashcardRecord> = {}): FlashcardRecord {
   return {
@@ -48,6 +48,10 @@ function makeCard(overrides: Partial<FlashcardRecord> = {}): FlashcardRecord {
 }
 
 describe("scheduler", () => {
+  it("starts new cards at the default adaptive score", () => {
+    expect(DEFAULT_ADAPTIVE_LEARNING_SCORE).toBe(0.5);
+  });
+
   it("decreases score after an oops", () => {
     const result = applyReviewOutcome(makeCard({ weight: 0.7 }), "oops", new Date("2026-04-02T00:00:00.000Z"));
     expect(result.weight).toBeLessThan(0.7);
@@ -65,34 +69,63 @@ describe("scheduler", () => {
     expect(result.consecutiveCorrect).toBe(4);
   });
 
-  it("suppresses immediate repeats", () => {
-    const now = new Date("2026-04-02T00:05:00.000Z");
-    const fresh = computeSamplingWeight(
+  it("uses the numerator offset and does not add one to the denominator", () => {
+    const result = applyReviewOutcome(
+      makeCard({ weight: 0.5, reviewCount: 3 }),
+      "got_it",
+      new Date("2026-04-02T00:00:00.000Z")
+    );
+
+    expect(result.weight).toBeCloseTo(0.8 * ((0.5 * 3 + 1 + 0.5) / 3) + 0.2);
+  });
+
+  it("does not clamp updated review scores", () => {
+    const highResult = applyReviewOutcome(
+      makeCard({ weight: 0.98, reviewCount: 10 }),
+      "got_it",
+      new Date("2026-04-02T00:00:00.000Z")
+    );
+
+    expect(highResult.weight).toBeGreaterThan(1);
+  });
+
+  it("bases sampling only on score", () => {
+    const recentlyReviewed = computeSamplingWeight(
       makeCard({
         weight: 0.15,
-        reviewCount: 4,
+        reviewCount: 1,
         lastReviewedAt: new Date("2026-04-02T00:04:30.000Z").toISOString(),
         lastResult: "oops"
-      }),
-      now
+      })
     );
-    const older = computeSamplingWeight(
+    const olderReviewed = computeSamplingWeight(
       makeCard({
         weight: 0.15,
-        reviewCount: 4,
+        reviewCount: 20,
         lastReviewedAt: new Date("2026-04-01T20:00:00.000Z").toISOString(),
-        lastResult: "oops"
-      }),
-      now
+        lastResult: "got_it"
+      })
     );
-    expect(fresh).toBeLessThan(older);
+
+    expect(recentlyReviewed).toBe(olderReviewed);
   });
 
   it("strongly favors poorly scored review directions", () => {
-    const now = new Date("2026-04-02T00:00:00.000Z");
-    const weak = computeSamplingWeight(makeCard({ weight: 0.15, reviewCount: 5 }), now);
-    const strong = computeSamplingWeight(makeCard({ weight: 0.8, reviewCount: 5 }), now);
+    const weak = computeSamplingWeight(makeCard({ weight: 0.15, reviewCount: 5 }));
+    const strong = computeSamplingWeight(makeCard({ weight: 0.8, reviewCount: 5 }));
 
     expect(weak).toBeGreaterThan(strong * 8);
+  });
+
+  it("keeps mastered directions from swamping a smaller weak pool", () => {
+    const weak = computeSamplingWeight(makeCard({ weight: 0.15, reviewCount: 5 }));
+    const mastered = computeSamplingWeight(makeCard({ weight: 0.97, reviewCount: 20 }));
+    const weakPoolSize = 10;
+    const masteredPoolSize = 90;
+    const weakPoolShare =
+      (weak * weakPoolSize) / (weak * weakPoolSize + mastered * masteredPoolSize);
+
+    expect(weak).toBeGreaterThan(mastered * 75);
+    expect(weakPoolShare).toBeGreaterThan(0.9);
   });
 });

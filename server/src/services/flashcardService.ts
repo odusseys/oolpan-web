@@ -1,5 +1,4 @@
 import {
-  LEARNED_SCORE_THRESHOLD,
   type AppLanguage,
   type CreateFlashcardRequest,
   type DeleteFlashcardResponse,
@@ -17,15 +16,19 @@ import {
   findFlashcardByPhrase,
   getDeckStats,
   getFlashcardById,
+  getLastServedFlashcardId,
   listRecentFlashcards,
   listFlashcards,
-  updateFlashcardReviewState
+  setLastServedFlashcardId,
+  updateFlashcardReviewState,
+  withUserStudyStateLock
 } from "../db/repository.js";
-import { applyReviewOutcome, computeSamplingWeight, sampleMultipleByScore } from "../lib/scheduler.js";
+import { getReviewMasteryChange } from "../lib/mastery.js";
+import { pickNextReviewCandidate } from "../lib/reviewQueue.js";
+import { applyReviewOutcome, computeSamplingWeight } from "../lib/scheduler.js";
 import { createAiClient } from "./aiClient.js";
 
 const aiClient = createAiClient();
-const lastServedReviewKeys = new Map<number, string | null>();
 
 type RequiredFlashcardPluralization = {
   sourcePluralText: string;
@@ -34,10 +37,6 @@ type RequiredFlashcardPluralization = {
 
 function toImageUrl(imageData: string | null) {
   return imageData;
-}
-
-function reviewKey(cardId: number, direction: ReviewDirection) {
-  return `${cardId}:${direction}`;
 }
 
 function getDirectionProgress(card: FlashcardRecord, direction: ReviewDirection) {
@@ -68,14 +67,14 @@ function getOppositeDirection(direction: ReviewDirection): ReviewDirection {
   return direction === "source_to_target" ? "target_to_source" : "source_to_target";
 }
 
-function getReviewCandidates(cards: FlashcardRecord[], now = new Date()) {
+function getReviewCandidates(cards: FlashcardRecord[]) {
   return cards.flatMap((card) =>
     (["source_to_target", "target_to_source"] as const).map((direction) => {
       const progress = getDirectionProgress(card, direction);
       return {
         card,
         direction,
-        samplingWeight: computeSamplingWeight(progress, now)
+        samplingWeight: computeSamplingWeight(progress)
       };
     })
   );
@@ -110,17 +109,6 @@ function toStudyCard(card: FlashcardRecord, reviewDirection: ReviewDirection): S
   };
 }
 
-function hasRequiredHebrewTransliteration(card: FlashcardRecord) {
-  const sourceReady = card.sourceLanguage !== "he" || Boolean(card.sourceTransliteration?.trim());
-  const targetReady = card.targetLanguage !== "he" || Boolean(card.targetTransliteration?.trim());
-
-  return sourceReady && targetReady;
-}
-
-function hasHebrewNikud(text: string) {
-  return /[\u0591-\u05C7]/u.test(text.normalize("NFC"));
-}
-
 function getMasteredFlashcardText(card: FlashcardRecord) {
   if (card.targetLanguage === "he") {
     return card.targetText;
@@ -131,45 +119,6 @@ function getMasteredFlashcardText(card: FlashcardRecord) {
   }
 
   return card.targetText;
-}
-
-async function getHebrewTransliteration(text: string, language: AppLanguage, existing?: string | null) {
-  if (existing?.trim()) {
-    return existing.trim();
-  }
-
-  if (language !== "he") {
-    return null;
-  }
-
-  return aiClient.transliterateHebrew(text);
-}
-
-async function addHebrewNikud(text: string, language: AppLanguage) {
-  const trimmedText = text.trim();
-
-  if (language !== "he") {
-    return trimmedText;
-  }
-
-  if (hasHebrewNikud(trimmedText)) {
-    return trimmedText;
-  }
-
-  return aiClient.addNikudToHebrew(trimmedText);
-}
-
-async function addNikudToFlashcardInput(input: CreateFlashcardRequest): Promise<CreateFlashcardRequest> {
-  const [sourceText, targetText] = await Promise.all([
-    addHebrewNikud(input.sourceText, input.sourceLanguage),
-    addHebrewNikud(input.targetText, input.targetLanguage)
-  ]);
-
-  return {
-    ...input,
-    sourceText,
-    targetText
-  };
 }
 
 async function getPluralization(input: CreateFlashcardRequest): Promise<RequiredFlashcardPluralization | null> {
@@ -197,22 +146,6 @@ async function getPluralization(input: CreateFlashcardRequest): Promise<Required
   };
 }
 
-async function addNikudToPluralization(input: CreateFlashcardRequest, pluralization: RequiredFlashcardPluralization | null) {
-  if (!pluralization) {
-    return null;
-  }
-
-  const [sourcePluralText, targetPluralText] = await Promise.all([
-    addHebrewNikud(pluralization.sourcePluralText, input.sourceLanguage),
-    addHebrewNikud(pluralization.targetPluralText, input.targetLanguage)
-  ]);
-
-  return {
-    sourcePluralText,
-    targetPluralText
-  };
-}
-
 async function getImagePrompt(input: CreateFlashcardRequest, existing: FlashcardRecord | null) {
   if (input.imagePrompt?.trim()) {
     return input.imagePrompt.trim();
@@ -230,40 +163,23 @@ async function getImagePrompt(input: CreateFlashcardRequest, existing: Flashcard
   });
 }
 
-async function getSingularTransliterations(input: CreateFlashcardRequest) {
-  return Promise.all([
-    getHebrewTransliteration(input.sourceText, input.sourceLanguage, input.sourceTransliteration),
-    getHebrewTransliteration(input.targetText, input.targetLanguage, input.targetTransliteration)
-  ]);
-}
-
-async function getPluralTransliterations(
-  input: CreateFlashcardRequest,
-  pluralization: RequiredFlashcardPluralization | null
-) {
-  if (!pluralization) {
-    return [null, null] as const;
-  }
-
-  return Promise.all([
-    getHebrewTransliteration(pluralization.sourcePluralText, input.sourceLanguage, input.sourcePluralTransliteration),
-    getHebrewTransliteration(pluralization.targetPluralText, input.targetLanguage, input.targetPluralTransliteration)
-  ]);
+function optionalText(value?: string | null) {
+  return value?.trim() || null;
 }
 
 export async function createFlashcardWithImage(userId: number, input: CreateFlashcardRequest) {
   const complementExpandedInput = await aiClient.expandVerbComplement(input);
-  const normalizedInput = await addNikudToFlashcardInput({
+  const normalizedInput = {
     ...input,
-    sourceText: complementExpandedInput.sourceText,
-    targetText: complementExpandedInput.targetText,
+    sourceText: complementExpandedInput.sourceText.trim(),
+    targetText: complementExpandedInput.targetText.trim(),
     sourcePluralText: null,
     targetPluralText: null,
     sourcePluralTransliteration: null,
     targetPluralTransliteration: null
-  });
+  };
   const existing = await findFlashcardByPhrase(userId, normalizedInput);
-  if (existing?.imageData && existing.isActive && hasRequiredHebrewTransliteration(existing)) {
+  if (existing?.imageData && existing.isActive) {
     return {
       card: existing,
       stats: await getDeckStats(userId)
@@ -271,27 +187,13 @@ export async function createFlashcardWithImage(userId: number, input: CreateFlas
   }
 
   const imagePromptPromise = getImagePrompt(normalizedInput, existing);
-  const pluralizationPromise = getPluralization(normalizedInput).then((pluralization) =>
-    addNikudToPluralization(normalizedInput, pluralization)
-  );
-  const singularTransliterationsPromise = getSingularTransliterations(normalizedInput);
-  const pluralTransliterationsPromise = pluralizationPromise.then((pluralization) =>
-    getPluralTransliterations(normalizedInput, pluralization)
-  );
+  const pluralizationPromise = getPluralization(normalizedInput);
   const generatedPromise = existing?.imageData
     ? Promise.resolve(null)
     : imagePromptPromise.then((imagePrompt) => aiClient.generateIllustration(imagePrompt));
-  const [
-    imagePrompt,
-    pluralization,
-    [sourceTransliteration, targetTransliteration],
-    [sourcePluralTransliteration, targetPluralTransliteration],
-    generated
-  ] = await Promise.all([
+  const [imagePrompt, pluralization, generated] = await Promise.all([
     imagePromptPromise,
     pluralizationPromise,
-    singularTransliterationsPromise,
-    pluralTransliterationsPromise,
     generatedPromise
   ]);
   const saved = await createFlashcard(
@@ -299,12 +201,12 @@ export async function createFlashcardWithImage(userId: number, input: CreateFlas
     {
       ...normalizedInput,
       imagePrompt,
-      sourceTransliteration,
-      targetTransliteration,
+      sourceTransliteration: optionalText(normalizedInput.sourceTransliteration),
+      targetTransliteration: optionalText(normalizedInput.targetTransliteration),
       sourcePluralText: pluralization?.sourcePluralText ?? null,
       targetPluralText: pluralization?.targetPluralText ?? null,
-      sourcePluralTransliteration,
-      targetPluralTransliteration
+      sourcePluralTransliteration: null,
+      targetPluralTransliteration: null
     },
     generated?.dataUrl ?? null
   );
@@ -319,28 +221,24 @@ export async function createFlashcardWithImage(userId: number, input: CreateFlas
   };
 }
 
-export async function getNextStudyCard(userId: number, excludedReviewKeyValues: string[] = []) {
-  const cards = await listFlashcards(userId);
-  const now = new Date();
-  const excludedReviewKeys = new Set(excludedReviewKeyValues);
-  const lastServedReviewKey = lastServedReviewKeys.get(userId) ?? null;
-  if (lastServedReviewKey) {
-    excludedReviewKeys.add(lastServedReviewKey);
-  }
+export async function getNextStudyCard(userId: number, excludedCardId?: number | null) {
+  return withUserStudyStateLock(userId, async (sql) => {
+    const cards = await listFlashcards(userId, sql);
+    const lastServedCardId = await getLastServedFlashcardId(userId, sql);
+    const candidates = getReviewCandidates(cards);
+    const picked = pickNextReviewCandidate(candidates, excludedCardId ?? lastServedCardId);
+    if (!picked) {
+      if (excludedCardId != null) {
+        await setLastServedFlashcardId(userId, excludedCardId, sql);
+      }
+      return null;
+    }
 
-  const candidates = getReviewCandidates(cards, now);
-  const eligibleCandidates = candidates.filter((candidate) => !excludedReviewKeys.has(reviewKey(candidate.card.id, candidate.direction)));
-  const picked =
-    sampleMultipleByScore(eligibleCandidates, (candidate) => candidate.samplingWeight, 1)[0] ??
-    sampleMultipleByScore(candidates, (candidate) => candidate.samplingWeight, 1)[0];
-  if (!picked) {
-    return null;
-  }
-
-  const card = toStudyCard(picked.card, picked.direction);
-  card.samplingWeight = picked.samplingWeight;
-  lastServedReviewKeys.set(userId, reviewKey(card.id, picked.direction));
-  return card;
+    const card = toStudyCard(picked.card, picked.direction);
+    card.samplingWeight = picked.samplingWeight;
+    await setLastServedFlashcardId(userId, card.id, sql);
+    return card;
+  });
 }
 
 export async function getStudyStats(userId: number) {
@@ -393,16 +291,11 @@ export async function reviewCard(userId: number, cardId: number, body: ReviewReq
   const directionProgress = getDirectionProgress(card, body.direction);
   const oppositeProgress = getDirectionProgress(card, getOppositeDirection(body.direction));
   const updates = applyReviewOutcome(directionProgress, body.result);
-  const isNewlyMastered =
-    !directionProgress.masteredAt &&
-    directionProgress.weight <= LEARNED_SCORE_THRESHOLD &&
-    updates.weight > LEARNED_SCORE_THRESHOLD;
-  const isNewlyFullyMastered =
-    !card.masteredAt && updates.weight > LEARNED_SCORE_THRESHOLD && oppositeProgress.weight > LEARNED_SCORE_THRESHOLD;
+  const masteryChange = getReviewMasteryChange(card, directionProgress, oppositeProgress, updates);
   const updatedCard = await updateFlashcardReviewState(userId, cardId, body.direction, {
     ...updates,
-    directionMasteredAt: isNewlyMastered ? updates.lastReviewedAt : null,
-    cardMasteredAt: isNewlyFullyMastered ? updates.lastReviewedAt : null
+    directionMasteredAt: masteryChange.directionMasteredAt,
+    cardMasteredAt: masteryChange.cardMasteredAt
   });
 
   if (!updatedCard) {
@@ -411,9 +304,9 @@ export async function reviewCard(userId: number, cardId: number, body: ReviewReq
 
   return {
     updatedCard,
-    nextCard: await getNextStudyCard(userId, [reviewKey(cardId, body.direction)]),
+    nextCard: await getNextStudyCard(userId, cardId),
     stats: await getDeckStats(userId),
-    masteredFlashcard: isNewlyMastered
+    masteredFlashcard: masteryChange.shouldNotifyLearnedWord
       ? {
           id: updatedCard.id,
           text: getMasteredFlashcardText(updatedCard),
@@ -429,14 +322,9 @@ export async function removeFlashcard(userId: number, cardId: number): Promise<D
     throw new Error("Flashcard not found");
   }
 
-  const lastServedReviewKey = lastServedReviewKeys.get(userId) ?? null;
-  if (lastServedReviewKey?.startsWith(`${cardId}:`)) {
-    lastServedReviewKeys.set(userId, null);
-  }
-
   return {
     removedId: cardId,
-    nextCard: await getNextStudyCard(userId),
+    nextCard: await getNextStudyCard(userId, cardId),
     stats: await getDeckStats(userId)
   };
 }

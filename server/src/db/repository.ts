@@ -64,6 +64,7 @@ type DeckStatsRow = {
 };
 
 type DbQueryable = DbClient | TransactionSql<Record<string, unknown>>;
+const STUDY_STATE_LOCK_NAMESPACE = 471103;
 
 function mapRow(row: FlashcardRow): FlashcardRecord {
   return {
@@ -178,13 +179,45 @@ async function reactivateFlashcardWithClient(
   `;
 }
 
-export async function listFlashcards(userId: number) {
-  const rows = await db<FlashcardRow[]>`
+export async function listFlashcards(userId: number, sql: DbQueryable = db) {
+  const rows = await sql<FlashcardRow[]>`
     SELECT * FROM flashcards
     WHERE user_id = ${userId} AND is_active = TRUE
     ORDER BY created_at DESC
   `;
   return rows.map(mapRow);
+}
+
+export async function getLastServedFlashcardId(userId: number, sql: DbQueryable = db) {
+  const rows = await sql<{ last_served_flashcard_id: number | null }[]>`
+    SELECT last_served_flashcard_id
+    FROM user_study_state
+    WHERE user_id = ${userId}
+    LIMIT 1
+  `;
+
+  return rows[0]?.last_served_flashcard_id ?? null;
+}
+
+export async function setLastServedFlashcardId(userId: number, flashcardId: number | null, sql: DbQueryable = db) {
+  const updatedAt = new Date().toISOString();
+  await sql`
+    INSERT INTO user_study_state (user_id, last_served_flashcard_id, updated_at)
+    VALUES (${userId}, ${flashcardId}, ${updatedAt})
+    ON CONFLICT (user_id)
+    DO UPDATE SET
+      last_served_flashcard_id = EXCLUDED.last_served_flashcard_id,
+      updated_at = EXCLUDED.updated_at
+  `;
+}
+
+export async function withUserStudyStateLock<T>(userId: number, operation: (sql: DbQueryable) => Promise<T>) {
+  return db.begin(async (sql) => {
+    await sql`
+      SELECT pg_advisory_xact_lock(${STUDY_STATE_LOCK_NAMESPACE}, ${userId})
+    `;
+    return operation(sql);
+  });
 }
 
 export async function listRecentFlashcards(userId: number, limit = 5) {
@@ -365,6 +398,9 @@ export async function deleteFlashcard(userId: number, id: number) {
         weight = 1,
         source_to_target_weight = 1,
         target_to_source_weight = 1,
+        source_to_target_mastered_at = COALESCE(source_to_target_mastered_at, ${updatedAt}),
+        target_to_source_mastered_at = COALESCE(target_to_source_mastered_at, ${updatedAt}),
+        mastered_at = COALESCE(mastered_at, ${updatedAt}),
         updated_at = ${updatedAt}
     WHERE user_id = ${userId} AND id = ${id} AND is_active = TRUE
     RETURNING id
@@ -387,8 +423,7 @@ export async function getDeckStats(userId: number): Promise<DeckStats> {
           )
       )::int AS due_soon,
       COUNT(DISTINCT id) FILTER (
-        WHERE is_active = TRUE
-          AND source_to_target_weight > ${LEARNED_SCORE_THRESHOLD}
+        WHERE source_to_target_weight > ${LEARNED_SCORE_THRESHOLD}
           AND target_to_source_weight > ${LEARNED_SCORE_THRESHOLD}
       )::int AS learned_words
     FROM flashcards

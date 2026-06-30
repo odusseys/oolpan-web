@@ -90,6 +90,14 @@ async function createSchema() {
     `);
 
     await sql`
+      CREATE TABLE IF NOT EXISTS user_study_state (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        last_served_flashcard_id INTEGER REFERENCES flashcards(id) ON DELETE SET NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      )
+    `;
+
+    await sql`
       CREATE INDEX IF NOT EXISTS flashcards_user_active_created_idx
       ON flashcards (user_id, is_active, created_at DESC)
     `;

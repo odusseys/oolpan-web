@@ -103,14 +103,6 @@ const translatedSuggestionsSchema = z.object({
   translations: z.array(z.object({ englishText: z.string().min(1), translatedText: z.string().min(1) })).length(10)
 });
 
-const transliterationResultSchema = z.object({
-  transliteration: z.string().min(1)
-});
-
-const nikudResultSchema = z.object({
-  textWithNikud: z.string().min(1)
-});
-
 const pluralizationResultSchema = z.object({
   canPluralize: z.boolean(),
   sourcePluralText: z.string().min(1).nullable(),
@@ -144,10 +136,6 @@ function languageName(language: AppLanguage) {
 
 function googleLanguageCode(language: AppLanguage) {
   return language;
-}
-
-function stripHebrewNikud(text: string) {
-  return text.normalize("NFC").replace(/[\u0591-\u05C7]/g, "");
 }
 
 function decodeHtmlEntities(text: string) {
@@ -405,14 +393,6 @@ class MockAiClient {
     };
   }
 
-  async transliterateHebrew(text: string): Promise<string> {
-    return `mock transliteration: ${text.trim()}`;
-  }
-
-  async addNikudToHebrew(text: string): Promise<string> {
-    return text.trim();
-  }
-
   async pluralizeFlashcard(input: FlashcardMeaning): Promise<FlashcardPluralization | null> {
     const source = input.sourceText.trim();
     const target = input.targetText.trim();
@@ -509,9 +489,7 @@ class OpenAiCompatibleAiClient {
       "Return JSON only with the key translation.",
       "Translate the source text into the target language using the natural phrasing someone would use in everyday conversation.",
       "Prefer the common spoken wording over a formal, literal, or dictionary-style translation when those differ.",
-      "If the target language is Hebrew, first determine the correct Hebrew translation without nikud.",
-      "Then add nikud to that exact translation.",
-      "Do not remove, replace, or reorder any Hebrew letters when adding nikud; only add nikud marks on top of the same letters."
+      "If the target language is Hebrew, return Hebrew without nikud."
     ].join(" ");
 
     const userPrompt = [
@@ -767,100 +745,6 @@ class OpenAiCompatibleAiClient {
     };
   }
 
-  async transliterateHebrew(text: string): Promise<string> {
-    if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
-      throw new Error("Missing LLM configuration");
-    }
-
-    const trimmedText = text.trim();
-    const systemPrompt = [
-      "You transliterate Hebrew for English-speaking language learners.",
-      "Return JSON only with the key transliteration.",
-      "Write the Hebrew text in simple Latin letters using common modern Israeli Hebrew pronunciation.",
-      "Preserve word order.",
-      "Do not use IPA symbols.",
-      "Do not explain anything."
-    ].join(" ");
-
-    const response = await fetch(endpointUrl(appConfig.llmApiBaseUrl, "responses"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${appConfig.llmApiKey}`
-      },
-      body: JSON.stringify({
-        model: miniModel(appConfig.llmModel),
-        reasoning: {
-          effort: "none"
-        },
-        instructions: systemPrompt,
-        input: trimmedText
-      })
-    });
-
-    if (!response.ok) {
-      await throwApiError("Transliteration request", response);
-    }
-
-    const payload = (await response.json()) as unknown;
-    const content = extractResponseOutputText(payload);
-    const parsed = transliterationResultSchema.parse(extractJsonObject(content));
-    return parsed.transliteration.trim();
-  }
-
-  async addNikudToHebrew(text: string): Promise<string> {
-    if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
-      throw new Error("Missing LLM configuration");
-    }
-
-    const trimmedText = text.trim();
-    const systemPrompt = [
-      "You add nikud to Hebrew text for language learners.",
-      "Return JSON only with the key textWithNikud.",
-      "Add the correct Hebrew nikud marks to the provided text.",
-      "This is a hard formatting rule: the output must contain the same base letters as the input.",
-      "Do not remove any existing Hebrew letters.",
-      "Do not replace any existing Hebrew letters.",
-      "Do not reorder any existing Hebrew letters.",
-      "Do not add new Hebrew letters.",
-      "Only add nikud marks to the exact existing Hebrew letters.",
-      "Keep spaces, punctuation, and non-Hebrew text unchanged.",
-      "Do not explain anything."
-    ].join(" ");
-
-    const response = await fetch(endpointUrl(appConfig.llmApiBaseUrl, "responses"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${appConfig.llmApiKey}`
-      },
-      body: JSON.stringify({
-        model: miniModel(appConfig.llmModel),
-        reasoning: {
-          effort: "none"
-        },
-        instructions: systemPrompt,
-        input: trimmedText
-      })
-    });
-
-    if (!response.ok) {
-      await throwApiError("Nikud request", response);
-    }
-
-    const payload = (await response.json()) as unknown;
-    const content = extractResponseOutputText(payload);
-    const parsed = nikudResultSchema.parse(extractJsonObject(content));
-    const textWithNikud = parsed.textWithNikud.trim();
-
-    if (stripHebrewNikud(textWithNikud) !== stripHebrewNikud(trimmedText)) {
-      console.warn("Nikud response changed the original Hebrew letters; keeping original text without generated nikud.");
-      return trimmedText;
-    }
-
-    return textWithNikud;
-  }
-
   async pluralizeFlashcard(input: FlashcardMeaning): Promise<FlashcardPluralization | null> {
     if (!appConfig.llmApiBaseUrl || !appConfig.llmApiKey || !appConfig.llmModel) {
       throw new Error("Missing LLM configuration");
@@ -873,7 +757,7 @@ class OpenAiCompatibleAiClient {
       "When canPluralize is true, return the natural plural version of the full source text and the full target text.",
       "If either side cannot be naturally pluralized, set canPluralize false and both plural fields to null.",
       "Use everyday conversational wording.",
-      "If a Hebrew plural is returned, include nikud.",
+      "If a Hebrew plural is returned, return Hebrew without nikud.",
       "Do not explain anything."
     ].join(" ");
 
@@ -937,7 +821,7 @@ class OpenAiCompatibleAiClient {
       "If the English phrase is already complete enough, or is not an infinitive verb phrase, set shouldExpand false and return both texts unchanged.",
       "When you expand one side, update the other language side to mean the same expanded phrase.",
       "Use everyday conversational wording.",
-      "If the returned Hebrew text includes Hebrew, include nikud.",
+      "If the returned Hebrew text includes Hebrew, return Hebrew without nikud.",
       "Do not explain anything."
     ].join(" ");
 
@@ -1086,13 +970,11 @@ class OpenAiCompatibleAiClient {
           "Return JSON only with the key translations.",
           "translations must be an array with the same order and length as the input items.",
           "Each object must contain englishText and translatedText.",
-          "First determine the correct Hebrew translation without nikud.",
-          "Then add nikud to that exact Hebrew translation.",
-          "Do not remove, replace, or reorder any Hebrew letters when adding nikud; only add nikud marks on top of the same letters."
+          "Return Hebrew without nikud."
         ].join(" ");
 
         const translationUserPrompt = [
-          "Translate these English study items into Hebrew with nikud.",
+          "Translate these English study items into Hebrew without nikud.",
           ...englishItems.map((item, index) => `${index + 1}. ${item}`)
         ].join("\n");
 

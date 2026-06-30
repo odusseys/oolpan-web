@@ -1,13 +1,18 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RootFinderModal } from "./components/RootFinderModal";
 import { StudyPanel } from "./components/StudyPanel";
 import { TranslatorPanel } from "./components/TranslatorPanel";
 import { api, isUnauthorizedError } from "./lib/api";
 import { t } from "./lib/copy";
+import { createFlashcardRequestFromRootEntry, loadPealimRootGroups, searchPealimRoots } from "./lib/rootFinder";
 import { clearLegacyMediaLocalStorage } from "./lib/storageCleanup";
 const AUTO_SPEAK_HEBREW_STORAGE_KEY = "oolpan_auto_speak_hebrew_flashcards";
 const AUTO_SPEAK_DELAY_MS = 500;
 const TRANSLATION_DEBOUNCE_MS = 700;
+const MOBILE_TAB_MEDIA_QUERY = "(max-width: 980px)";
+const MOBILE_TAB_SWIPE_MIN_DISTANCE_PX = 56;
+const MOBILE_TAB_SWIPE_DOMINANCE_RATIO = 1.25;
 const MEDIA_CACHE_NAME = "oolpan-media-v1";
 const MEDIA_CACHE_ROUTE = "/__oolpan_media";
 const MEDIA_CACHE_MAX_ENTRIES = 80;
@@ -42,6 +47,32 @@ function isEditableShortcutTarget(target) {
     }
     const tagName = target.tagName.toLowerCase();
     return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+}
+function isMobileTabViewport() {
+    return typeof window !== "undefined" && window.matchMedia(MOBILE_TAB_MEDIA_QUERY).matches;
+}
+function findChangedTouch(touches, identifier) {
+    for (let index = 0; index < touches.length; index += 1) {
+        const touch = touches.item(index);
+        if (touch?.identifier === identifier) {
+            return touch;
+        }
+    }
+    return null;
+}
+function getSwipeTargetTab(currentTab, deltaX) {
+    if (deltaX < 0 && currentTab === "translate") {
+        return "flashcards";
+    }
+    if (deltaX > 0 && currentTab === "flashcards") {
+        return "translate";
+    }
+    return null;
+}
+function isHorizontalTabSwipe(deltaX, deltaY) {
+    const absoluteX = Math.abs(deltaX);
+    const absoluteY = Math.abs(deltaY);
+    return absoluteX >= MOBILE_TAB_SWIPE_MIN_DISTANCE_PX && absoluteX > absoluteY * MOBILE_TAB_SWIPE_DOMINANCE_RATIO;
 }
 function canUseServiceWorkerMediaCache() {
     return (typeof window !== "undefined" &&
@@ -122,6 +153,13 @@ export default function App() {
     const [isAppMenuOpen, setIsAppMenuOpen] = useState(false);
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const [isRootFinderOpen, setIsRootFinderOpen] = useState(false);
+    const [rootFinderQuery, setRootFinderQuery] = useState("");
+    const [rootFinderGroups, setRootFinderGroups] = useState(null);
+    const [isRootFinderLoading, setIsRootFinderLoading] = useState(false);
+    const [rootFinderError, setRootFinderError] = useState(null);
+    const [savingRootEntryId, setSavingRootEntryId] = useState(null);
+    const [addedRootEntryIds, setAddedRootEntryIds] = useState(() => new Set());
     const [sourceLanguage, setSourceLanguage] = useState("en");
     const [targetLanguage, setTargetLanguage] = useState("he");
     const [text, setText] = useState("");
@@ -159,6 +197,7 @@ export default function App() {
     const autoSpeakTimeoutRef = useRef(null);
     const liveTranslateTimeoutRef = useRef(null);
     const hasSkippedInitialLiveTranslateRef = useRef(false);
+    const mobileTabSwipeStartRef = useRef(null);
     const latestTranslationRequestRef = useRef(0);
     const latestTranslationInputRef = useRef({
         text,
@@ -173,6 +212,7 @@ export default function App() {
     const translatorSpeechLanguage = sourceLanguage === "he" ? sourceLanguage : (translationResult?.targetLanguage ?? targetLanguage);
     const translationAudioKey = `translator:${translatorSpeechLanguage}:${translatorSpeechText}`;
     const appDirection = "ltr";
+    const rootFinderResults = useMemo(() => searchPealimRoots(rootFinderGroups, rootFinderQuery), [rootFinderGroups, rootFinderQuery]);
     useEffect(() => {
         clearLegacyMediaLocalStorage();
     }, []);
@@ -214,9 +254,13 @@ export default function App() {
         setSuggestions([]);
         setSuggestionsContextCount(0);
         setAddedSuggestionIds(new Set());
+        setAddedRootEntryIds(new Set());
         setTranslationResult(null);
         setText("");
         setIsSuggestionsOpen(false);
+        setIsRootFinderOpen(false);
+        setRootFinderQuery("");
+        setSavingRootEntryId(null);
         setIsRevealed(false);
         setLoadingAudioKey(null);
     }, []);
@@ -376,17 +420,18 @@ export default function App() {
         };
     }, [clearSession, loadDeckData, pushToast, uiLanguage]);
     useEffect(() => {
-        if (!isSuggestionsOpen) {
+        if (!isSuggestionsOpen && !isRootFinderOpen) {
             return;
         }
         function handleKeyDown(event) {
             if (event.key === "Escape") {
                 setIsSuggestionsOpen(false);
+                setIsRootFinderOpen(false);
             }
         }
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isSuggestionsOpen]);
+    }, [isRootFinderOpen, isSuggestionsOpen]);
     useEffect(() => {
         if (!isAppMenuOpen && !isLogoutConfirmOpen && !isHelpOpen) {
             return;
@@ -401,6 +446,33 @@ export default function App() {
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isAppMenuOpen, isHelpOpen, isLogoutConfirmOpen]);
+    useEffect(() => {
+        if (!isRootFinderOpen || rootFinderGroups) {
+            return;
+        }
+        let isCancelled = false;
+        setIsRootFinderLoading(true);
+        setRootFinderError(null);
+        void loadPealimRootGroups()
+            .then((groups) => {
+            if (!isCancelled) {
+                setRootFinderGroups(groups);
+            }
+        })
+            .catch(() => {
+            if (!isCancelled) {
+                setRootFinderError(t(uiLanguage, "rootFinderLoadError"));
+            }
+        })
+            .finally(() => {
+            if (!isCancelled) {
+                setIsRootFinderLoading(false);
+            }
+        });
+        return () => {
+            isCancelled = true;
+        };
+    }, [isRootFinderOpen, rootFinderGroups, uiLanguage]);
     useEffect(() => {
         window.localStorage.setItem(AUTO_SPEAK_HEBREW_STORAGE_KEY, String(autoSpeakHebrewFlashcards));
     }, [autoSpeakHebrewFlashcards]);
@@ -532,6 +604,23 @@ export default function App() {
             setSavingSuggestionId(null);
         }
     }
+    async function handleSaveRootFlashcard(entry) {
+        try {
+            setSavingRootEntryId(entry.id);
+            const response = await api.createFlashcard(createFlashcardRequestFromRootEntry(entry));
+            await loadDeckData();
+            setLearnedWords(response.stats.learnedWords);
+            setIsRevealed(false);
+            setAddedRootEntryIds((current) => new Set(current).add(entry.id));
+            pushToast(t(uiLanguage, "rootFinderAdded"), "success");
+        }
+        catch (requestError) {
+            pushToast(requestError instanceof Error ? requestError.message : "Unknown error", "error");
+        }
+        finally {
+            setSavingRootEntryId(null);
+        }
+    }
     async function handleReview(result) {
         if (!currentCard) {
             return;
@@ -587,6 +676,7 @@ export default function App() {
                 isLogoutConfirmOpen ||
                 isHelpOpen ||
                 isSuggestionsOpen ||
+                isRootFinderOpen ||
                 isReviewBusy ||
                 isRemovingCard) {
                 return;
@@ -624,12 +714,17 @@ export default function App() {
         isRemovingCard,
         isRevealed,
         isReviewBusy,
+        isRootFinderOpen,
         isSuggestionsOpen,
         mobileTab
     ]);
     async function handleOpenSuggestions() {
         setIsSuggestionsOpen(true);
         await loadSuggestions();
+    }
+    function handleOpenRootFinder() {
+        setIsAppMenuOpen(false);
+        setIsRootFinderOpen(true);
     }
     const handleSpeak = useCallback(async (key, speechText, language, options) => {
         const trimmedText = speechText.trim();
@@ -852,6 +947,47 @@ export default function App() {
     function handleInputChange(value) {
         setText(value);
     }
+    const handleMobileTabTouchStart = useCallback((event) => {
+        if (!isMobileTabViewport() || event.touches.length !== 1) {
+            mobileTabSwipeStartRef.current = null;
+            return;
+        }
+        const touch = event.touches.item(0);
+        if (!touch) {
+            mobileTabSwipeStartRef.current = null;
+            return;
+        }
+        mobileTabSwipeStartRef.current = {
+            identifier: touch.identifier,
+            x: touch.clientX,
+            y: touch.clientY
+        };
+    }, []);
+    const handleMobileTabTouchMove = useCallback((event) => {
+        if (event.touches.length > 1) {
+            mobileTabSwipeStartRef.current = null;
+        }
+    }, []);
+    const handleMobileTabTouchEnd = useCallback((event) => {
+        const swipeStart = mobileTabSwipeStartRef.current;
+        mobileTabSwipeStartRef.current = null;
+        if (!swipeStart || !isMobileTabViewport()) {
+            return;
+        }
+        const touch = findChangedTouch(event.changedTouches, swipeStart.identifier);
+        if (!touch) {
+            return;
+        }
+        const deltaX = touch.clientX - swipeStart.x;
+        const deltaY = touch.clientY - swipeStart.y;
+        if (!isHorizontalTabSwipe(deltaX, deltaY)) {
+            return;
+        }
+        setMobileTab((currentTab) => getSwipeTargetTab(currentTab, deltaX) ?? currentTab);
+    }, []);
+    const handleMobileTabTouchCancel = useCallback(() => {
+        mobileTabSwipeStartRef.current = null;
+    }, []);
     if (!isAuthReady) {
         return (_jsxs("div", { className: "app-shell", dir: appDirection, children: [_jsx("div", { className: "background-glow glow-one" }), _jsx("div", { className: "background-glow glow-two" }), _jsx("div", { className: "background-glow glow-three" }), _jsx("div", { className: "background-glow glow-four" }), _jsx("div", { className: "background-glow glow-five" }), _jsx("div", { className: "background-glow glow-six" }), _jsx("main", { className: "auth-shell", children: _jsx("section", { className: "panel auth-panel auth-panel-loading", children: _jsx("span", { className: "button-spinner", "aria-hidden": "true" }) }) })] }));
     }
@@ -873,10 +1009,10 @@ export default function App() {
                                         setIsHelpOpen(true);
                                     }, children: _jsx("span", { className: "button-content", children: _jsx("span", { children: t(uiLanguage, "authContinueToApp") }) }) }) })] }) })] }));
     }
-    return (_jsxs("div", { className: "app-shell", dir: appDirection, children: [_jsx("div", { className: "background-glow glow-one" }), _jsx("div", { className: "background-glow glow-two" }), _jsx("div", { className: "background-glow glow-three" }), _jsx("div", { className: "background-glow glow-four" }), _jsx("div", { className: "background-glow glow-five" }), _jsx("div", { className: "background-glow glow-six" }), masteryCelebration ? (_jsxs("div", { className: "mastery-celebration", "aria-live": "assertive", "aria-atomic": "true", children: [_jsx("div", { className: "firework firework-one", "aria-hidden": "true" }), _jsx("div", { className: "firework firework-two", "aria-hidden": "true" }), _jsx("div", { className: "firework firework-three", "aria-hidden": "true" }), _jsxs("p", { children: [masteryCelebration.text, " mastered!"] })] })) : null, _jsxs("div", { className: "content-frame", children: [_jsxs("header", { className: "app-header", children: [_jsxs("div", { className: "brand-lockup", children: [_jsx("img", { className: "brand-logo", src: "/oolpan-logo.png", alt: "Oolpan" }), _jsx("h1", { className: "sr-only", children: t(uiLanguage, "appName") }), _jsxs("div", { className: "header-actions", children: [_jsxs("div", { className: "learned-counter", children: [_jsx("span", { className: "learned-counter-label", children: t(uiLanguage, "learnedWords") }), _jsx("strong", { children: learnedWords }), _jsx("div", { className: "help-shell", children: _jsx("button", { className: "help-trigger", type: "button", "aria-label": t(uiLanguage, "helpLabel"), "aria-expanded": isHelpOpen, onClick: () => setIsHelpOpen((current) => !current), children: "?" }) })] }), _jsx("button", { className: "secondary-button desktop-suggestions-button", type: "button", disabled: isSuggestionsLoading, onClick: () => void handleOpenSuggestions(), children: _jsxs("span", { className: "button-content", children: [isSuggestionsLoading ? _jsx("span", { className: "button-spinner", "aria-hidden": "true" }) : null, _jsx("span", { children: t(uiLanguage, "getSuggestions") })] }) })] })] }), _jsx("div", { className: "header-menu-shell", children: _jsx("button", { className: "menu-trigger header-menu-trigger", type: "button", "aria-haspopup": "dialog", "aria-expanded": isAppMenuOpen, "aria-controls": "account-menu-modal", "aria-label": t(uiLanguage, "authMenuLabel"), onClick: () => setIsAppMenuOpen((current) => !current), children: "\u22EF" }) })] }), isAppMenuOpen ? (_jsx("div", { className: "modal-backdrop", role: "presentation", onClick: () => setIsAppMenuOpen(false), children: _jsxs("section", { id: "account-menu-modal", className: "modal-panel app-menu-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "account-menu-title", onClick: (event) => event.stopPropagation(), children: [_jsxs("div", { className: "section-row modal-header app-menu-modal-header", children: [_jsxs("div", { children: [_jsx("h2", { id: "account-menu-title", children: t(uiLanguage, "authMenuTitle") }), currentUser ? (_jsxs("p", { className: "modal-caption", children: [t(uiLanguage, "authSignedInAs"), " ", currentUser.username] })) : null] }), _jsx("button", { className: "secondary-button modal-close-button app-menu-close-button", type: "button", onClick: () => setIsAppMenuOpen(false), children: t(uiLanguage, "close") })] }), _jsx("div", { className: "app-menu-actions", role: "menu", children: _jsx("button", { className: "menu-action header-menu-action app-menu-action", type: "button", role: "menuitem", onClick: () => {
-                                            setIsAppMenuOpen(false);
-                                            setIsLogoutConfirmOpen(true);
-                                        }, children: t(uiLanguage, "authLogout") }) })] }) })) : null, issuedPassword ? (_jsxs("div", { className: "password-banner", children: [_jsxs("div", { children: [_jsxs("strong", { children: [t(uiLanguage, "authPasswordNotice"), ":"] }), " ", _jsx("span", { children: issuedPassword })] }), _jsx("button", { className: "secondary-button password-banner-button", type: "button", onClick: () => setIssuedPassword(null), children: t(uiLanguage, "authPasswordDismiss") })] })) : null, isLogoutConfirmOpen ? (_jsx("div", { className: "modal-backdrop", role: "presentation", onClick: () => setIsLogoutConfirmOpen(false), children: _jsxs("section", { className: "modal-panel confirm-panel", role: "dialog", "aria-modal": "true", onClick: (event) => event.stopPropagation(), children: [_jsxs("div", { className: "confirm-copy", children: [_jsx("h2", { children: t(uiLanguage, "authLogoutConfirmTitle") }), _jsx("p", { className: "modal-caption confirm-body", children: t(uiLanguage, "authLogoutConfirmBody") })] }), _jsxs("div", { className: "confirm-actions", children: [_jsx("button", { className: "secondary-button", type: "button", onClick: () => setIsLogoutConfirmOpen(false), children: _jsx("span", { className: "button-content", children: _jsx("span", { children: t(uiLanguage, "authCancel") }) }) }), _jsx("button", { className: "danger-button", type: "button", onClick: () => void handleLogout(), children: _jsx("span", { className: "button-content", children: _jsx("span", { children: t(uiLanguage, "authConfirmLogout") }) }) })] })] }) })) : null, isHelpOpen ? (_jsx("div", { className: "modal-backdrop", role: "presentation", onClick: () => setIsHelpOpen(false), children: _jsxs("section", { className: "modal-panel help-modal", role: "dialog", "aria-modal": "true", onClick: (event) => event.stopPropagation(), children: [_jsx("div", { className: "confirm-copy", children: _jsx("h2", { children: t(uiLanguage, "helpLabel") }) }), _jsxs("ol", { className: "help-modal-copy", children: [_jsx("li", { children: t(uiLanguage, "helpTranslate") }), _jsx("li", { children: t(uiLanguage, "helpGuess") }), _jsx("li", { children: t(uiLanguage, "helpReview") }), _jsx("li", { children: t(uiLanguage, "helpAdaptive") })] }), _jsx("div", { className: "confirm-actions", children: _jsx("button", { className: "secondary-button", type: "button", onClick: () => setIsHelpOpen(false), children: _jsx("span", { className: "button-content", children: _jsx("span", { children: t(uiLanguage, "close") }) }) }) })] }) })) : null, _jsx("div", { className: "toast-stack", "aria-live": "polite", "aria-atomic": "true", children: toasts.map((toast) => (_jsx("div", { className: toast.tone === "error" ? "toast toast-error" : "toast toast-success", children: toast.message }, toast.id))) }), _jsxs("div", { className: "mobile-tabs", children: [_jsxs("div", { className: "mobile-tab-group", role: "tablist", "aria-label": "Sections", children: [_jsx("button", { type: "button", className: mobileTab === "translate" ? "mobile-tab active" : "mobile-tab", onClick: () => setMobileTab("translate"), children: t(uiLanguage, "translateTab") }), _jsx("button", { type: "button", className: mobileTab === "flashcards" ? "mobile-tab active" : "mobile-tab", onClick: () => setMobileTab("flashcards"), children: t(uiLanguage, "studyTab") })] }), _jsx("button", { className: "secondary-button mobile-suggestions-button", type: "button", disabled: isSuggestionsLoading, "aria-label": t(uiLanguage, "getSuggestions"), title: t(uiLanguage, "getSuggestions"), onClick: () => void handleOpenSuggestions(), children: _jsx("span", { className: "button-content", children: isSuggestionsLoading ? (_jsx("span", { className: "button-spinner", "aria-hidden": "true" })) : (_jsx("span", { className: "button-emoji", "aria-hidden": "true", children: "\uD83D\uDCA1" })) }) })] }), _jsxs("main", { className: "main-grid", children: [_jsx("div", { className: mobileTab === "translate" ? "panel-wrap active-mobile" : "panel-wrap", children: _jsx(TranslatorPanel, { uiLanguage: uiLanguage, sourceLanguage: sourceLanguage, targetLanguage: targetLanguage, text: text, result: translationResult, isTranslating: isTranslating, isSaving: isSavingFlashcard, isSpeakingTranslation: loadingAudioKey === translationAudioKey, onTextChange: handleInputChange, onSwap: swapLanguages, onSave: handleSaveFlashcard, onSpeakTranslation: () => void handleSpeak(translationAudioKey, translatorSpeechText, translatorSpeechLanguage) }) }), _jsx("div", { className: mobileTab === "flashcards" ? "panel-wrap active-mobile" : "panel-wrap", children: _jsx(StudyPanel, { uiLanguage: uiLanguage, card: currentCard, isRevealed: isRevealed, isBusy: isReviewBusy || isRemovingCard, pendingReviewResult: pendingReviewResult, isRemoving: isRemovingCard, loadingAudioKey: loadingAudioKey, autoSpeakHebrew: autoSpeakHebrewFlashcards, onReveal: () => setIsRevealed(true), onReview: handleReview, onRemove: handleRemoveFlashcard, onToggleAutoSpeakHebrew: () => setAutoSpeakHebrewFlashcards((current) => !current), onSpeak: (key, speechText, language) => void handleSpeak(key, speechText, language) }) })] })] }), isSuggestionsOpen ? (_jsx("div", { className: "modal-backdrop", role: "presentation", onClick: () => setIsSuggestionsOpen(false), children: _jsxs("section", { className: "modal-panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "suggestions-title", onClick: (event) => event.stopPropagation(), children: [_jsxs("div", { className: "section-row modal-header", children: [_jsxs("div", { children: [_jsx("h2", { id: "suggestions-title", children: t(uiLanguage, "suggestionsModalTitle") }), _jsx("p", { className: "modal-caption", children: suggestionsContextCount > 0
+    return (_jsxs("div", { className: "app-shell", dir: appDirection, children: [_jsx("div", { className: "background-glow glow-one" }), _jsx("div", { className: "background-glow glow-two" }), _jsx("div", { className: "background-glow glow-three" }), _jsx("div", { className: "background-glow glow-four" }), _jsx("div", { className: "background-glow glow-five" }), _jsx("div", { className: "background-glow glow-six" }), masteryCelebration ? (_jsxs("div", { className: "mastery-celebration", "aria-live": "assertive", "aria-atomic": "true", children: [_jsx("div", { className: "firework firework-one", "aria-hidden": "true" }), _jsx("div", { className: "firework firework-two", "aria-hidden": "true" }), _jsx("div", { className: "firework firework-three", "aria-hidden": "true" }), _jsxs("p", { children: [masteryCelebration.text, " mastered!"] })] })) : null, _jsxs("div", { className: "content-frame", children: [_jsxs("header", { className: "app-header", children: [_jsxs("div", { className: "brand-lockup", children: [_jsx("img", { className: "brand-logo", src: "/oolpan-logo.png", alt: "Oolpan" }), _jsx("h1", { className: "sr-only", children: t(uiLanguage, "appName") }), _jsxs("div", { className: "header-actions", children: [_jsxs("div", { className: "learned-counter", children: [_jsx("span", { className: "learned-counter-label", children: t(uiLanguage, "learnedWords") }), _jsx("strong", { children: learnedWords }), _jsx("div", { className: "help-shell", children: _jsx("button", { className: "help-trigger", type: "button", "aria-label": t(uiLanguage, "helpLabel"), "aria-expanded": isHelpOpen, onClick: () => setIsHelpOpen((current) => !current), children: "?" }) })] }), _jsx("button", { className: "secondary-button desktop-suggestions-button", type: "button", disabled: isSuggestionsLoading, onClick: () => void handleOpenSuggestions(), children: _jsxs("span", { className: "button-content", children: [isSuggestionsLoading ? _jsx("span", { className: "button-spinner", "aria-hidden": "true" }) : null, _jsx("span", { children: t(uiLanguage, "getSuggestions") })] }) })] })] }), _jsx("div", { className: "header-menu-shell", children: _jsx("button", { className: "menu-trigger header-menu-trigger", type: "button", "aria-haspopup": "dialog", "aria-expanded": isAppMenuOpen, "aria-controls": "account-menu-modal", "aria-label": t(uiLanguage, "authMenuLabel"), onClick: () => setIsAppMenuOpen((current) => !current), children: "\u22EF" }) })] }), isAppMenuOpen ? (_jsx("div", { className: "modal-backdrop", role: "presentation", onClick: () => setIsAppMenuOpen(false), children: _jsxs("section", { id: "account-menu-modal", className: "modal-panel app-menu-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "account-menu-title", onClick: (event) => event.stopPropagation(), children: [_jsxs("div", { className: "section-row modal-header app-menu-modal-header", children: [_jsxs("div", { children: [_jsx("h2", { id: "account-menu-title", children: t(uiLanguage, "authMenuTitle") }), currentUser ? (_jsxs("p", { className: "modal-caption", children: [t(uiLanguage, "authSignedInAs"), " ", currentUser.username] })) : null] }), _jsx("button", { className: "secondary-button modal-close-button app-menu-close-button", type: "button", onClick: () => setIsAppMenuOpen(false), children: t(uiLanguage, "close") })] }), _jsxs("div", { className: "app-menu-actions", role: "menu", children: [_jsx("button", { className: "menu-action header-menu-action app-menu-action app-menu-action-neutral", type: "button", role: "menuitem", onClick: handleOpenRootFinder, children: t(uiLanguage, "rootFinderMenu") }), _jsx("button", { className: "menu-action header-menu-action app-menu-action", type: "button", role: "menuitem", onClick: () => {
+                                                setIsAppMenuOpen(false);
+                                                setIsLogoutConfirmOpen(true);
+                                            }, children: t(uiLanguage, "authLogout") })] })] }) })) : null, issuedPassword ? (_jsxs("div", { className: "password-banner", children: [_jsxs("div", { children: [_jsxs("strong", { children: [t(uiLanguage, "authPasswordNotice"), ":"] }), " ", _jsx("span", { children: issuedPassword })] }), _jsx("button", { className: "secondary-button password-banner-button", type: "button", onClick: () => setIssuedPassword(null), children: t(uiLanguage, "authPasswordDismiss") })] })) : null, isLogoutConfirmOpen ? (_jsx("div", { className: "modal-backdrop", role: "presentation", onClick: () => setIsLogoutConfirmOpen(false), children: _jsxs("section", { className: "modal-panel confirm-panel", role: "dialog", "aria-modal": "true", onClick: (event) => event.stopPropagation(), children: [_jsxs("div", { className: "confirm-copy", children: [_jsx("h2", { children: t(uiLanguage, "authLogoutConfirmTitle") }), _jsx("p", { className: "modal-caption confirm-body", children: t(uiLanguage, "authLogoutConfirmBody") })] }), _jsxs("div", { className: "confirm-actions", children: [_jsx("button", { className: "secondary-button", type: "button", onClick: () => setIsLogoutConfirmOpen(false), children: _jsx("span", { className: "button-content", children: _jsx("span", { children: t(uiLanguage, "authCancel") }) }) }), _jsx("button", { className: "danger-button", type: "button", onClick: () => void handleLogout(), children: _jsx("span", { className: "button-content", children: _jsx("span", { children: t(uiLanguage, "authConfirmLogout") }) }) })] })] }) })) : null, isHelpOpen ? (_jsx("div", { className: "modal-backdrop", role: "presentation", onClick: () => setIsHelpOpen(false), children: _jsxs("section", { className: "modal-panel help-modal", role: "dialog", "aria-modal": "true", onClick: (event) => event.stopPropagation(), children: [_jsx("div", { className: "confirm-copy", children: _jsx("h2", { children: t(uiLanguage, "helpLabel") }) }), _jsxs("ol", { className: "help-modal-copy", children: [_jsx("li", { children: t(uiLanguage, "helpTranslate") }), _jsx("li", { children: t(uiLanguage, "helpGuess") }), _jsx("li", { children: t(uiLanguage, "helpReview") }), _jsx("li", { children: t(uiLanguage, "helpAdaptive") })] }), _jsx("div", { className: "confirm-actions", children: _jsx("button", { className: "secondary-button", type: "button", onClick: () => setIsHelpOpen(false), children: _jsx("span", { className: "button-content", children: _jsx("span", { children: t(uiLanguage, "close") }) }) }) })] }) })) : null, _jsx("div", { className: "toast-stack", "aria-live": "polite", "aria-atomic": "true", children: toasts.map((toast) => (_jsx("div", { className: toast.tone === "error" ? "toast toast-error" : "toast toast-success", children: toast.message }, toast.id))) }), _jsxs("div", { className: "mobile-tabs", children: [_jsxs("div", { className: "mobile-tab-group", role: "tablist", "aria-label": "Sections", children: [_jsx("button", { type: "button", className: mobileTab === "translate" ? "mobile-tab active" : "mobile-tab", onClick: () => setMobileTab("translate"), children: t(uiLanguage, "translateTab") }), _jsx("button", { type: "button", className: mobileTab === "flashcards" ? "mobile-tab active" : "mobile-tab", onClick: () => setMobileTab("flashcards"), children: t(uiLanguage, "studyTab") })] }), _jsx("button", { className: "secondary-button mobile-suggestions-button", type: "button", disabled: isSuggestionsLoading, "aria-label": t(uiLanguage, "getSuggestions"), title: t(uiLanguage, "getSuggestions"), onClick: () => void handleOpenSuggestions(), children: _jsx("span", { className: "button-content", children: isSuggestionsLoading ? (_jsx("span", { className: "button-spinner", "aria-hidden": "true" })) : (_jsx("span", { className: "button-emoji", "aria-hidden": "true", children: "\uD83D\uDCA1" })) }) })] }), _jsxs("main", { className: "main-grid", onTouchStart: handleMobileTabTouchStart, onTouchMove: handleMobileTabTouchMove, onTouchEnd: handleMobileTabTouchEnd, onTouchCancel: handleMobileTabTouchCancel, children: [_jsx("div", { className: mobileTab === "translate" ? "panel-wrap active-mobile" : "panel-wrap", children: _jsx(TranslatorPanel, { uiLanguage: uiLanguage, sourceLanguage: sourceLanguage, targetLanguage: targetLanguage, text: text, result: translationResult, isTranslating: isTranslating, isSaving: isSavingFlashcard, isSpeakingTranslation: loadingAudioKey === translationAudioKey, onTextChange: handleInputChange, onSwap: swapLanguages, onSave: handleSaveFlashcard, onSpeakTranslation: () => void handleSpeak(translationAudioKey, translatorSpeechText, translatorSpeechLanguage) }) }), _jsx("div", { className: mobileTab === "flashcards" ? "panel-wrap active-mobile" : "panel-wrap", children: _jsx(StudyPanel, { uiLanguage: uiLanguage, card: currentCard, isRevealed: isRevealed, isBusy: isReviewBusy || isRemovingCard, pendingReviewResult: pendingReviewResult, isRemoving: isRemovingCard, loadingAudioKey: loadingAudioKey, autoSpeakHebrew: autoSpeakHebrewFlashcards, onReveal: () => setIsRevealed(true), onReview: handleReview, onRemove: handleRemoveFlashcard, onToggleAutoSpeakHebrew: () => setAutoSpeakHebrewFlashcards((current) => !current), onSpeak: (key, speechText, language) => void handleSpeak(key, speechText, language) }) })] })] }), isSuggestionsOpen ? (_jsx("div", { className: "modal-backdrop", role: "presentation", onClick: () => setIsSuggestionsOpen(false), children: _jsxs("section", { className: "modal-panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "suggestions-title", onClick: (event) => event.stopPropagation(), children: [_jsxs("div", { className: "section-row modal-header", children: [_jsxs("div", { children: [_jsx("h2", { id: "suggestions-title", children: t(uiLanguage, "suggestionsModalTitle") }), _jsx("p", { className: "modal-caption", children: suggestionsContextCount > 0
                                                 ? `${t(uiLanguage, "suggestionsCaption")} (${suggestionsContextCount})`
                                                 : t(uiLanguage, "suggestionsCaption") })] }), _jsx("button", { className: "secondary-button modal-close-button", type: "button", onClick: () => setIsSuggestionsOpen(false), children: t(uiLanguage, "close") })] }), isSuggestionsLoading ? (_jsxs("div", { className: "suggestions-empty suggestions-loading", children: [_jsx("span", { className: "button-spinner", "aria-hidden": "true" }), _jsx("span", { children: t(uiLanguage, "loadingSuggestions") })] })) : suggestions.length === 0 ? (_jsx("div", { className: "suggestions-empty", children: t(uiLanguage, "suggestionsEmpty") })) : (_jsxs(_Fragment, { children: [_jsx("div", { className: "suggestions-modal-grid", children: suggestions.map((suggestion) => {
                                         const isAdded = addedSuggestionIds.has(suggestion.id);
@@ -890,5 +1026,5 @@ export default function App() {
                                             ? `suggestion:${suggestion.id}:he:${suggestionHebrewText}`
                                             : null;
                                         return (_jsxs("article", { className: isAdded ? "suggestion-card suggestion-card-added" : "suggestion-card", children: [_jsxs("div", { className: "suggestion-copy", children: [_jsx("p", { dir: suggestion.sourceLanguage === "he" ? "rtl" : "ltr", children: suggestion.sourceText }), _jsx("p", { className: "suggestion-translation", dir: suggestion.targetLanguage === "he" ? "rtl" : "ltr", children: suggestion.targetText })] }), _jsxs("div", { className: "suggestion-actions", children: [suggestionAudioKey ? (_jsx("button", { className: "icon-speak-button suggestion-speak-button", type: "button", "aria-label": t(uiLanguage, "playAudio"), title: t(uiLanguage, "playAudio"), disabled: loadingAudioKey !== null, onClick: () => void handleSpeak(suggestionAudioKey, suggestionHebrewText, "he"), children: loadingAudioKey === suggestionAudioKey ? (_jsx("span", { className: "button-spinner", "aria-hidden": "true" })) : (_jsx("span", { "aria-hidden": "true", children: "\uD83D\uDD0A" })) })) : null, _jsx("button", { className: isAdded ? "suggestion-add-button suggestion-add-button-added" : "suggestion-add-button", type: "button", disabled: isAdded || savingSuggestionId !== null, onClick: () => void handleSaveSuggestedFlashcard(suggestion), children: _jsxs("span", { className: "button-content", children: [isSavingThisSuggestion ? _jsx("span", { className: "button-spinner", "aria-hidden": "true" }) : null, isAdded ? _jsx("span", { className: "suggestion-added-check", "aria-hidden": "true", children: "\u2713" }) : null, _jsx("span", { children: isAdded ? t(uiLanguage, "suggestionAddedButton") : t(uiLanguage, "addSuggestion") })] }) })] })] }, suggestion.id));
-                                    }) }), _jsx("div", { className: "suggestions-more-row", children: _jsx("button", { className: "secondary-button suggestions-more-button", type: "button", disabled: isSuggestionsMoreLoading || isSuggestionsLoading, onClick: () => void loadSuggestions("append"), children: _jsxs("span", { className: "button-content", children: [isSuggestionsMoreLoading ? _jsx("span", { className: "button-spinner", "aria-hidden": "true" }) : null, _jsx("span", { children: t(uiLanguage, "suggestMore") })] }) }) })] }))] }) })) : null] }));
+                                    }) }), _jsx("div", { className: "suggestions-more-row", children: _jsx("button", { className: "secondary-button suggestions-more-button", type: "button", disabled: isSuggestionsMoreLoading || isSuggestionsLoading, onClick: () => void loadSuggestions("append"), children: _jsxs("span", { className: "button-content", children: [isSuggestionsMoreLoading ? _jsx("span", { className: "button-spinner", "aria-hidden": "true" }) : null, _jsx("span", { children: t(uiLanguage, "suggestMore") })] }) }) })] }))] }) })) : null, isRootFinderOpen ? (_jsx(RootFinderModal, { uiLanguage: uiLanguage, query: rootFinderQuery, results: rootFinderResults, isLoading: isRootFinderLoading, error: rootFinderError, savingEntryId: savingRootEntryId, addedEntryIds: addedRootEntryIds, onQueryChange: setRootFinderQuery, onAddEntry: (entry) => void handleSaveRootFlashcard(entry), onClose: () => setIsRootFinderOpen(false) })) : null] }));
 }

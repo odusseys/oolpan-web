@@ -1,36 +1,30 @@
 import type { FlashcardRecord, ReviewResult } from "@study/shared";
 
-export const DEFAULT_ADAPTIVE_LEARNING_SCORE = 0.2;
+export const DEFAULT_ADAPTIVE_LEARNING_SCORE = 0.5;
 export const DEFAULT_ADAPTIVE_INITIAL_TRIALS = 3;
 
 const SCORE_DECAY_FACTOR = 0.8;
-const MIN_SCORE = 0.02;
-const MAX_SCORE = 0.98;
+const SCORE_UPDATE_NUMERATOR_OFFSET = DEFAULT_ADAPTIVE_LEARNING_SCORE;
 const SCORE_SAMPLING_EXPONENT = 1.7;
 const SCORE_SAMPLING_MULTIPLIER = 2;
+const MIN_SAMPLING_WEIGHT = 0.015;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function minutesSince(isoDate: string | null, now: Date) {
-  if (!isoDate) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return Math.max(0, (now.getTime() - new Date(isoDate).getTime()) / 60000);
-}
-
 function computeNewScore(score: number, trials: number, success: boolean) {
   const added = success ? 1 : 0;
-  const rawNewScore = (score * trials + added) / (trials + 1);
-  return clamp(SCORE_DECAY_FACTOR * rawNewScore + (1 - SCORE_DECAY_FACTOR) * added, MIN_SCORE, MAX_SCORE);
+  const rawNewScore = (score * trials + added + SCORE_UPDATE_NUMERATOR_OFFSET) / trials;
+  return SCORE_DECAY_FACTOR * rawNewScore + (1 - SCORE_DECAY_FACTOR) * added;
 }
 
 type ReviewProgress = Pick<
   FlashcardRecord,
-  "weight" | "reviewCount" | "mistakeCount" | "consecutiveCorrect" | "lastReviewedAt" | "lastResult"
+  "weight" | "reviewCount" | "mistakeCount" | "consecutiveCorrect"
 >;
+
+type SamplingProgress = Pick<FlashcardRecord, "weight">;
 
 export function sampleMultipleByScore<T>(items: T[], score: (item: T) => number, nSamples = 1): T[] {
   const candidates = [...items];
@@ -82,35 +76,16 @@ export function applyReviewOutcome(progress: ReviewProgress, result: ReviewResul
   };
 }
 
-export function computeSamplingWeight(progress: ReviewProgress, now = new Date()) {
-  const recencyMinutes = minutesSince(progress.lastReviewedAt, now);
-  const noveltyMultiplier = progress.reviewCount < DEFAULT_ADAPTIVE_INITIAL_TRIALS ? 1.35 : 1;
-  const strugglingBoost = progress.lastResult === "oops" ? 1.25 : 1;
-  const ageBoost = Number.isFinite(recencyMinutes)
-    ? clamp(1 + recencyMinutes / (60 * 24), 1, 2.4)
-    : 1.3;
+export function computeSamplingWeight(progress: SamplingProgress) {
   const masteryGap = clamp(1 - progress.weight, 0.04, 1);
-  const masteryNeed = clamp(
+  return clamp(
     Math.pow(masteryGap, SCORE_SAMPLING_EXPONENT) * SCORE_SAMPLING_MULTIPLIER,
-    0.08,
+    MIN_SAMPLING_WEIGHT,
     2.4
   );
-
-  let recencyPenalty = 1;
-  if (recencyMinutes < 1) {
-    recencyPenalty = 0.08;
-  } else if (recencyMinutes < 3) {
-    recencyPenalty = 0.18;
-  } else if (recencyMinutes < 10) {
-    recencyPenalty = 0.45;
-  } else if (recencyMinutes < 30) {
-    recencyPenalty = 0.72;
-  }
-
-  return clamp(masteryNeed * noveltyMultiplier * strugglingBoost * ageBoost * recencyPenalty, 0.08, 30);
 }
 
-export function pickWeightedRandom(cards: FlashcardRecord[], now = new Date(), excludedIds: number[] = []) {
+export function pickWeightedRandom(cards: FlashcardRecord[], excludedIds: number[] = []) {
   if (cards.length === 0) {
     return null;
   }
@@ -123,7 +98,7 @@ export function pickWeightedRandom(cards: FlashcardRecord[], now = new Date(), e
 
   const weightedCards = eligibleCards.map((card) => ({
     card,
-    samplingWeight: computeSamplingWeight(card, now)
+    samplingWeight: computeSamplingWeight(card)
   }));
   const picked = sampleMultipleByScore(weightedCards, (entry) => entry.samplingWeight, 1)[0];
   if (!picked) {

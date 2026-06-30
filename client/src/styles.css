@@ -1403,6 +1403,12 @@ textarea {
   border: 1px solid rgba(255, 196, 207, 0.7);
 }
 
+.app-menu-action-neutral {
+  border-color: rgba(135, 191, 181, 0.62);
+  background: rgba(221, 244, 239, 0.92);
+  color: #245e58;
+}
+
 .app-menu-close-button {
   min-height: 44px;
 }
@@ -1470,6 +1476,146 @@ textarea {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.root-finder-modal {
+  width: min(980px, 100%);
+}
+
+.root-finder-search {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.root-finder-search input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.52);
+  color: #3f2a57;
+  font-size: 1.08rem;
+  padding: 0 13px;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.root-finder-search input:focus {
+  border-color: rgba(117, 93, 191, 0.52);
+  box-shadow: 0 0 0 3px rgba(117, 93, 191, 0.14);
+}
+
+.root-finder-empty {
+  min-height: 84px;
+}
+
+.root-finder-error {
+  color: #8a4358;
+}
+
+.root-finder-results {
+  display: grid;
+  gap: 14px;
+}
+
+.root-finder-group {
+  display: grid;
+  gap: 8px;
+}
+
+.root-finder-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #62477d;
+  font-size: 0.86rem;
+}
+
+.root-finder-group-header strong {
+  color: #2f2240;
+  font-size: 1.12rem;
+  letter-spacing: 0;
+}
+
+.root-finder-group-header span:last-child {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.42);
+  color: #4f386a;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.root-finder-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.root-finder-entry {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 10px;
+}
+
+.root-finder-entry-added {
+  border-color: rgba(42, 148, 85, 0.34);
+  background: rgba(212, 247, 224, 0.38);
+}
+
+.root-finder-entry-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.root-finder-entry-copy p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.root-finder-hebrew {
+  color: #2e2140;
+  font-size: 1.16rem;
+  line-height: 1.25;
+}
+
+.root-finder-translation {
+  color: #6a4e87;
+  font-size: 0.92rem;
+  line-height: 1.32;
+}
+
+.root-finder-entry-footer {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.root-finder-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.root-finder-meta span {
+  max-width: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.36);
+  color: #694f84;
+  font-size: 0.72rem;
+  line-height: 1.15;
+  padding: 4px 7px;
+  overflow-wrap: anywhere;
 }
 
 @keyframes modal-fade-in {
@@ -1775,6 +1921,19 @@ textarea {
 
   .suggestions-modal-grid {
     grid-template-columns: 1fr;
+  }
+
+  .root-finder-entry-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .root-finder-entry-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .root-finder-entry-footer .suggestion-add-button {
+    width: 100%;
   }
 
   .password-banner {
